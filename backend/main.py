@@ -1,0 +1,622 @@
+"""
+main.py — Claims Intelligence & Fraud Detection API (Groq Edition)
+===================================================================
+ARCHITECTURE OVERVIEW:
+  This FastAPI backend is the brain of the system. Every claim analysis
+  passes through three sequential intelligence layers:
+
+  Layer A │ Structured ML (RandomForest)
+           │   → Reads numeric + categorical claim fields
+           │   → Outputs a fraud probability (0.0–1.0) → risk score (0–100)
+           │
+  Layer B │ SHAP Explainability
+           │   → Answers "WHY is the score high?" mathematically
+           │   → Returns top feature contribution as human-readable text
+           │   → Critical for the "glass-box" explainability panel in the UI
+           │
+  Layer C │ Groq LLM (llama-3.3-70b)
+           │   → Reads the unstructured doctor's note
+           │   → Acts as a medical auditor: does the note justify the bill?
+           │   → Returns 1-2 sentence finding + detailed SHAP breakdown
+
+IMPORTANT: This is ADVISORY ONLY. No automated decisions are made.
+           A human investigator reviews every flagged claim.
+
+Prerequisites:
+    pip install -r requirements.txt
+    Set GROQ_API_KEY in a .env file or environment variable
+
+Run:
+    uvicorn main:app --reload --port 8000
+
+API Docs (auto-generated):
+    http://localhost:8000/docs
+"""
+
+import os
+import logging
+from contextlib import asynccontextmanager
+from typing import Any
+
+import joblib
+import numpy as np
+import pandas as pd
+import shap
+from groq import Groq
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+# ── Environment & logging setup ────────────────────────────────────────────────
+# load_dotenv() reads a .env file in the current directory.
+# Variables set there become available via os.getenv().
+load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s │ %(levelname)s │ %(message)s"
+)
+log = logging.getLogger(__name__)
+
+# ── Constants ──────────────────────────────────────────────────────────────────
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+MODEL_PATH   = "fraud_model.joblib"
+
+# MUST match train_model.py exactly — same column names, same order
+CATEGORICAL_FEATURES = ["Provider_ID", "Diagnosis_Code", "Procedure_Code"]
+NUMERIC_FEATURES     = ["Total_Claim_Amount"]
+ALL_FEATURES         = CATEGORICAL_FEATURES + NUMERIC_FEATURES
+
+# Per-diagnosis expected amount stats (matches prep_data.py distributions).
+# Used to calculate z-scores for the SHAP narrative.
+# In production these would be computed from real historical data and persisted.
+DIAG_STATS = {
+    "J06.9":  {"mean": 150,    "std": 40},
+    "M54.5":  {"mean": 320,    "std": 80},
+    "E11.9":  {"mean": 600,    "std": 150},
+    "I10":    {"mean": 500,    "std": 120},
+    "K21.0":  {"mean": 280,    "std": 70},
+    "Z00.00": {"mean": 200,    "std": 50},
+    "S72.001":{"mean": 8500,   "std": 900},
+    "C34.10": {"mean": 12000,  "std": 2000},
+    "F32.1":  {"mean": 400,    "std": 100},
+    "N39.0":  {"mean": 180,    "std": 45},
+}
+# Fallback stats when diagnosis code is unknown
+DEFAULT_STATS = {"mean": 1200.0, "std": 2500.0}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Application state — shared across all requests (loaded once at startup)
+# ══════════════════════════════════════════════════════════════════════════════
+class AppState:
+    """
+    Holds expensive-to-load objects so we don't reload them on every request.
+    The pipeline and SHAP explainer each take several seconds to initialize —
+    doing this once at startup keeps API latency low.
+    """
+    pipeline:     Any       = None   # the full fitted imblearn Pipeline
+    explainer:    Any       = None   # SHAP TreeExplainer around the RF
+    feature_names: list[str] = []    # OHE-expanded feature names
+    groq_client:  Any       = None   # Groq API client
+
+
+app_state = AppState()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Lifespan — runs once when the server starts and stops
+# ══════════════════════════════════════════════════════════════════════════════
+@asynccontextmanager
+async def lifespan(app_instance):
+    """
+    FastAPI's modern startup/shutdown hook (replaces @app.on_event).
+    Everything before 'yield' runs at startup.
+    Everything after 'yield' runs at shutdown.
+    """
+    log.info("🚀  Server starting — loading model and explainer …")
+
+    # ── Load the trained pipeline from disk ────────────────────────────────
+    # joblib.load() deserializes the entire sklearn/imblearn Pipeline object,
+    # including all fitted transformers and the RandomForest weights.
+    app_state.pipeline = joblib.load(MODEL_PATH)
+    log.info(f"✅  Pipeline loaded from '{MODEL_PATH}'")
+
+    # ── Extract sub-components for SHAP ───────────────────────────────────
+    # We need the preprocessor to transform inputs before SHAP sees them,
+    # and the RF directly (not wrapped in Pipeline) for TreeExplainer.
+    preprocessor  = app_state.pipeline.named_steps["preprocessor"]
+    rf_model      = app_state.pipeline.named_steps["classifier"]
+
+    # Get the expanded feature names after One-Hot Encoding.
+    # OHE turns "Provider_ID=PRV-0007" into a binary column "Provider_ID_PRV-0007".
+    # There will be many more columns after OHE than before.
+    ohe           = preprocessor.named_transformers_["cat"]
+    ohe_names     = ohe.get_feature_names_out(CATEGORICAL_FEATURES).tolist()
+    app_state.feature_names = ohe_names + NUMERIC_FEATURES
+
+    # ── Initialize SHAP TreeExplainer ────────────────────────────────────
+    # TreeExplainer is the fast, exact SHAP method for tree-based models.
+    # It computes exact Shapley values (not approximations) using the tree
+    # structure directly — much faster than model-agnostic KernelExplainer.
+    app_state.explainer = shap.TreeExplainer(
+        rf_model,
+        feature_names=app_state.feature_names,
+    )
+    log.info("✅  SHAP TreeExplainer ready")
+
+    # ── Initialize Groq client ────────────────────────────────────────────
+    if GROQ_API_KEY:
+        app_state.groq_client = Groq(api_key=GROQ_API_KEY)
+        log.info("✅  Groq client initialized")
+    else:
+        log.warning("⚠️  GROQ_API_KEY not set — LLM analysis will be skipped")
+
+    yield  # ← server runs here, handling requests
+
+    log.info("🛑  Server shutting down")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FastAPI app instance
+# ══════════════════════════════════════════════════════════════════════════════
+app = FastAPI(
+    title="Claims Intelligence & Fraud Detection API",
+    description=(
+        "Advisory-only system combining ML risk scoring, SHAP explainability, "
+        "and Groq LLM clinical note analysis. No automated decisions."
+    ),
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# ── CORS Middleware ────────────────────────────────────────────────────────────
+# CORS (Cross-Origin Resource Sharing) is a browser security feature.
+# Without this, your React frontend (localhost:3000) can't call your
+# FastAPI backend (localhost:8000) — the browser blocks the request.
+# allow_origins=["*"] allows ALL origins — fine for hackathon, restrict in prod.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Pydantic models — request and response schemas
+# ══════════════════════════════════════════════════════════════════════════════
+class ClaimRequest(BaseModel):
+    """
+    Defines the expected JSON body for POST /analyze_claim.
+    Pydantic automatically validates types and raises 422 if anything is wrong.
+    The Field(...) with example values powers the /docs UI auto-demo.
+    """
+    Provider_ID:        str   = Field(..., example="PRV-0007")
+    Diagnosis_Code:     str   = Field(..., example="J06.9")
+    Procedure_Code:     str   = Field(..., example="99214")
+    Total_Claim_Amount: float = Field(..., gt=0, example=9500.00)
+    Unstructured_Notes: str   = Field(..., example="Patient had mild sore throat. Prescribed lozenges.")
+
+
+class SHAPDetail(BaseModel):
+    """Individual feature contribution for the bar chart in the UI."""
+    feature:    str    # e.g. "Total_Claim_Amount" or "Provider_ID_PRV-0007"
+    value:      float  # raw SHAP value (positive = pushes toward fraud)
+    display:    str    # human-readable label shown in the chart
+
+
+class ClaimResponse(BaseModel):
+    """
+    The full response JSON sent back to the frontend.
+    Every field maps directly to a UI component:
+      risk_score        → the big number badge
+      risk_label        → colored pill (HIGH/MEDIUM/LOW)
+      shap_explanation  → text in the Glass-Box panel
+      shap_details      → data for the SHAP bar chart
+      llm_text_analysis → Groq's auditor finding
+      advisory_note     → always-present disclaimer banner
+    """
+    risk_score:         int          # 0–100
+    risk_label:         str          # "HIGH" | "MEDIUM" | "LOW"
+    shap_explanation:   str          # top driver, plain English
+    shap_details:       list[SHAPDetail]  # top 5 features for chart
+    llm_text_analysis:  str          # Groq medical auditor finding
+    diagnosis_stats:    dict         # mean/std for the diagnosed code (for UI display)
+    advisory_note:      str          # mandatory disclaimer
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Helper: SHAP explanation builder
+# ══════════════════════════════════════════════════════════════════════════════
+def build_shap_outputs(
+    shap_values_row: np.ndarray,
+    feature_names:   list[str],
+    claim:           "ClaimRequest",
+) -> tuple[str, list[SHAPDetail]]:
+    """
+    Takes a 1-D array of SHAP values (one per feature) and produces:
+      1. A plain-English sentence describing the top driver
+      2. A list of SHAPDetail objects for the top 5 features (for the bar chart)
+
+    SHAP values interpretation:
+      + positive value → this feature INCREASES the fraud probability
+      - negative value → this feature DECREASES the fraud probability
+      The magnitude tells you how much.
+    """
+    abs_shap    = np.abs(shap_values_row)
+    # Get indices sorted by absolute SHAP value, largest first
+    top_indices = np.argsort(abs_shap)[::-1][:5]
+
+    # ── Build the top-5 list for the bar chart ─────────────────────────────
+    shap_details = []
+    for idx in top_indices:
+        fname = feature_names[idx]
+        val   = float(shap_values_row[idx])
+
+        # Make feature names human-readable for display
+        # "cat__Provider_ID_PRV-0007" → "Provider: PRV-0007"
+        if "Provider_ID_" in fname:
+            display = f"Provider: {fname.split('Provider_ID_')[-1]}"
+        elif "Diagnosis_Code_" in fname:
+            display = f"Diagnosis: {fname.split('Diagnosis_Code_')[-1]}"
+        elif "Procedure_Code_" in fname:
+            display = f"Procedure: {fname.split('Procedure_Code_')[-1]}"
+        elif fname == "Total_Claim_Amount":
+            display = f"Claim Amount: ${claim.Total_Claim_Amount:,.0f}"
+        else:
+            display = fname
+
+        shap_details.append(SHAPDetail(
+            feature=fname,
+            value=round(val, 4),
+            display=display,
+        ))
+
+    # ── Build plain-English sentence for top driver ────────────────────────
+    top_idx     = int(top_indices[0])
+    top_feature = feature_names[top_idx]
+    top_val     = float(shap_values_row[top_idx])
+    direction   = "significantly increases" if top_val > 0 else "decreases"
+
+    if top_feature == "Total_Claim_Amount":
+        # Add z-score context: how many standard deviations above normal is this?
+        stats   = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
+        z_score = (claim.Total_Claim_Amount - stats["mean"]) / stats["std"]
+        explanation = (
+            f"Primary driver: Claim amount ${claim.Total_Claim_Amount:,.2f} is "
+            f"{abs(z_score):.1f} standard deviations "
+            f"{'above' if z_score > 0 else 'below'} the expected "
+            f"${stats['mean']:,.0f} mean for diagnosis {claim.Diagnosis_Code}. "
+            f"This {direction} the fraud risk score (SHAP: {top_val:+.4f})."
+        )
+    elif "Provider_ID_" in top_feature:
+        provider = top_feature.split("Provider_ID_")[-1]
+        explanation = (
+            f"Primary driver: Provider {provider} has a billing history pattern "
+            f"that {direction} the fraud risk score (SHAP: {top_val:+.4f})."
+        )
+    elif "Diagnosis_Code_" in top_feature:
+        code = top_feature.split("Diagnosis_Code_")[-1]
+        explanation = (
+            f"Primary driver: Diagnosis code {code} in combination with the "
+            f"billed amount {direction} the fraud risk score (SHAP: {top_val:+.4f})."
+        )
+    else:
+        explanation = (
+            f"Primary driver: '{top_feature}' {direction} the fraud risk score "
+            f"(SHAP contribution: {top_val:+.4f})."
+        )
+
+    return explanation, shap_details
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Helper: Groq LLM clinical note analysis
+# ══════════════════════════════════════════════════════════════════════════════
+def analyze_with_groq(claim: "ClaimRequest", risk_score: int, shap_text: str) -> str:
+    """
+    Sends the claim context to Groq's LLaMA model acting as a medical auditor.
+
+    WHY Groq:
+      Groq's LPU (Language Processing Unit) hardware delivers extremely low
+      latency — typically <1 second for this prompt size. Critical for a
+      real-time dashboard that needs to feel snappy.
+
+    WHY llama-3.3-70b-versatile:
+      Large enough to have genuine medical billing knowledge, but fast enough
+      for interactive use. The 70B model understands ICD-10 codes, CPT codes,
+      and can reason about clinical appropriateness.
+    """
+    if not app_state.groq_client:
+        return "LLM analysis unavailable — GROQ_API_KEY not configured."
+
+    # Retrieve diagnosis-specific stats for context
+    stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
+
+    # The system prompt defines the AI's persona and constraints.
+    # Being specific ("senior medical billing auditor") produces much better
+    # output than a generic "helpful assistant" prompt.
+    system_prompt = """You are a senior medical billing auditor with 15+ years of 
+experience in healthcare fraud detection. Your role is ADVISORY ONLY — you 
+flag potential issues for human investigators but never make final decisions.
+Be concise, specific, and clinically accurate. Reference actual medical billing 
+standards when relevant."""
+
+    # The user prompt provides all context the model needs.
+    # We include the ML risk score and SHAP finding so the LLM can
+    # integrate structured and unstructured signals in its response.
+    user_prompt = f"""Analyze this healthcare claim for potential fraud indicators:
+
+CLAIM DETAILS:
+- Provider ID: {claim.Provider_ID}
+- Diagnosis Code: {claim.Diagnosis_Code}
+- Procedure Code: {claim.Procedure_Code}
+- Billed Amount: ${claim.Total_Claim_Amount:,.2f}
+- Expected Range for {claim.Diagnosis_Code}: ${stats['mean']-stats['std']:,.0f} – ${stats['mean']+stats['std']:,.0f}
+- ML Risk Score: {risk_score}/100
+- ML Finding: {shap_text}
+
+DOCTOR'S NOTE:
+"{claim.Unstructured_Notes}"
+
+Your task:
+1. Does the doctor's note clinically justify the billed amount and diagnosis code?
+2. Are there any contradictions between the note content and the billing?
+3. What specific red flags (if any) should a human investigator examine?
+
+Respond in exactly 3 sentences. Be specific about amounts, codes, and clinical reasoning."""
+
+    try:
+        response = app_state.groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+            temperature=0.1,      # very low → factual, consistent, reproducible
+            max_tokens=250,       # enforce brevity for the UI panel
+        )
+        return response.choices[0].message.content.strip()
+
+    except Exception as exc:
+        log.error(f"Groq API error: {exc}")
+        return f"LLM analysis unavailable: {str(exc)[:200]}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Main endpoint: POST /analyze_claim
+# ══════════════════════════════════════════════════════════════════════════════
+@app.post("/analyze_claim", response_model=ClaimResponse)
+async def analyze_claim(claim: ClaimRequest):
+    """
+    Single endpoint that orchestrates all three intelligence layers.
+
+    Request body: ClaimRequest JSON
+    Returns: ClaimResponse JSON
+
+    Flow:
+      1. Build a 1-row DataFrame from the request
+      2. Run preprocessor → get numeric feature array
+      3. Run RF.predict_proba → get fraud probability → risk score
+      4. Run SHAP → get feature contributions → explanation text + chart data
+      5. Call Groq → get clinical note analysis
+      6. Package everything into ClaimResponse
+    """
+
+    # ── Layer A: ML Inference ──────────────────────────────────────────────
+    # Build a single-row DataFrame matching the training schema exactly.
+    # Column names and dtypes must be identical to what train_model.py used.
+    input_df = pd.DataFrame([{
+        "Provider_ID":        claim.Provider_ID,
+        "Diagnosis_Code":     claim.Diagnosis_Code,
+        "Procedure_Code":     claim.Procedure_Code,
+        "Total_Claim_Amount": claim.Total_Claim_Amount,
+    }])
+
+    try:
+        # Extract the fitted preprocessor and RF from the pipeline.
+        # We call them separately (not pipeline.predict_proba) because
+        # we need the intermediate numeric array for SHAP.
+        preprocessor = app_state.pipeline.named_steps["preprocessor"]
+        rf_model     = app_state.pipeline.named_steps["classifier"]
+
+        # Transform: string columns → OHE binary columns + numeric passthrough
+        # X_transformed shape: (1, n_features_after_OHE)
+        X_transformed = preprocessor.transform(input_df)
+
+        # predict_proba returns [[prob_legit, prob_fraud]]
+        # We want index [0, 1] = probability of class 1 (fraud)
+        fraud_prob  = float(rf_model.predict_proba(X_transformed)[0, 1])
+        risk_score  = int(round(fraud_prob * 100))
+
+    except Exception as exc:
+        log.exception("ML inference failed")
+        raise HTTPException(status_code=500, detail=f"ML inference error: {exc}")
+
+    # Risk label thresholds (aligned with UI color scheme):
+    #   HIGH   (red)    → immediate review queue
+    #   MEDIUM (yellow) → secondary review
+    #   LOW    (green)  → routine processing
+    if risk_score >= 60:
+        risk_label = "HIGH"
+    elif risk_score >= 30:
+        risk_label = "MEDIUM"
+    else:
+        risk_label = "LOW"
+
+    log.info(f"Claim scored → {risk_score}/100 ({risk_label}) | Provider: {claim.Provider_ID}")
+
+    # ── Layer B: SHAP Explainability ───────────────────────────────────────
+    shap_explanation = "SHAP analysis unavailable."
+    shap_details     = []
+
+    try:
+        # Compute SHAP values for this single transformed input row.
+        # TreeExplainer is exact (not approximate) for tree models.
+        # Returns shape varies by shap version — handle all cases below.
+        raw_shap = app_state.explainer.shap_values(X_transformed)
+
+        # Normalize to 1-D array of SHAP values for class=1 (fraud)
+        if isinstance(raw_shap, list):
+            # Old shap API: list[n_classes] where each element is (n_samples, n_features)
+            class_idx = 1 if len(raw_shap) > 1 else 0
+            shap_arr  = np.array(raw_shap[class_idx])
+            shap_row  = shap_arr.reshape(-1, shap_arr.shape[-1])[0]
+        else:
+            arr = np.array(raw_shap)
+            if arr.ndim == 3:
+                # New shap API: (n_samples, n_features, n_classes)
+                shap_row = arr[0, :, 1]
+            elif arr.ndim == 2:
+                # (n_samples, n_features)
+                shap_row = arr[0]
+            else:
+                shap_row = arr
+
+        shap_explanation, shap_details = build_shap_outputs(
+            shap_row,
+            app_state.feature_names,
+            claim,
+        )
+
+    except Exception as exc:
+        log.warning(f"SHAP failed: {exc}")
+        shap_explanation = f"SHAP analysis unavailable: {exc}"
+
+    # ── Layer C: Groq LLM Analysis ─────────────────────────────────────────
+    # Pass both the SHAP finding and risk score so Groq can integrate
+    # structured ML signals with its unstructured note analysis.
+    llm_analysis = analyze_with_groq(claim, risk_score, shap_explanation)
+
+    # ── Diagnosis stats for the frontend display ───────────────────────────
+    stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
+
+    return ClaimResponse(
+        risk_score        = risk_score,
+        risk_label        = risk_label,
+        shap_explanation  = shap_explanation,
+        shap_details      = shap_details,
+        llm_text_analysis = llm_analysis,
+        diagnosis_stats   = {
+            "code":            claim.Diagnosis_Code,
+            "expected_mean":   stats["mean"],
+            "expected_std":    stats["std"],
+            "billed_amount":   claim.Total_Claim_Amount,
+            "z_score":         round(
+                (claim.Total_Claim_Amount - stats["mean"]) / stats["std"], 2
+            ),
+        },
+        advisory_note = (
+            "⚠️  ADVISORY TOOL ONLY — This system flags anomalies for human review. "
+            "No claim is automatically approved or rejected. "
+            "All final decisions must be made by a qualified human investigator."
+        ),
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Chatbot endpoint: POST /chat  (for the Agentic AI Investigator UI widget)
+# ══════════════════════════════════════════════════════════════════════════════
+class ChatRequest(BaseModel):
+    message:      str
+    claim_context: dict | None = None   # optional: attach claim data to the chat
+
+
+class ChatResponse(BaseModel):
+    reply: str
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(req: ChatRequest):
+    """
+    Powers the floating 'Agentic AI Investigator' chatbot in the UI.
+    The user can ask natural-language questions like:
+      "Why was this claim flagged?"
+      "What's the normal range for J06.9?"
+      "Summarize the risk factors"
+
+    The claim_context (if provided) is injected into the system prompt
+    so the AI can answer specifically about the current claim being viewed.
+    """
+    if not app_state.groq_client:
+        return ChatResponse(reply="Groq API not configured. Please set GROQ_API_KEY.")
+
+    # Build context block if claim data is attached
+    context_block = ""
+    if req.claim_context:
+        ctx = req.claim_context
+        context_block = f"""
+Currently reviewing claim:
+- Provider: {ctx.get('Provider_ID', 'N/A')}
+- Diagnosis: {ctx.get('Diagnosis_Code', 'N/A')}
+- Procedure: {ctx.get('Procedure_Code', 'N/A')}
+- Billed: ${ctx.get('Total_Claim_Amount', 0):,.2f}
+- Risk Score: {ctx.get('risk_score', 'N/A')}/100
+- ML Finding: {ctx.get('shap_explanation', 'N/A')}
+- Doctor's Note: "{ctx.get('Unstructured_Notes', 'N/A')}"
+"""
+
+    system = f"""You are an AI fraud investigation assistant embedded in a healthcare 
+claims fraud detection platform. You help human investigators understand why claims 
+were flagged and what to look for.
+{context_block}
+Be concise, helpful, and always remind investigators that you are advisory only.
+Never recommend claim rejection — only flag items for human review."""
+
+    try:
+        response = app_state.groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system",  "content": system},
+                {"role": "user",    "content": req.message},
+            ],
+            temperature=0.3,
+            max_tokens=300,
+        )
+        return ChatResponse(reply=response.choices[0].message.content.strip())
+    except Exception as exc:
+        log.error(f"Chat Groq error: {exc}")
+        return ChatResponse(reply=f"Error: {str(exc)[:150]}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Health check — used by frontend to verify backend is alive
+# ══════════════════════════════════════════════════════════════════════════════
+@app.get("/health")
+async def health():
+    """
+    Simple liveness check. The frontend pings this on load to show
+    the connection status indicator in the sidebar.
+    """
+    return {
+        "status":       "ok",
+        "model_loaded": app_state.pipeline  is not None,
+        "shap_ready":   app_state.explainer is not None,
+        "groq_ready":   app_state.groq_client is not None,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Demo endpoint — returns pre-built sample claims for the UI demo table
+# ══════════════════════════════════════════════════════════════════════════════
+@app.get("/demo_claims")
+async def demo_claims():
+    """
+    Returns 8 sample claims for the Alert Queue table in the frontend.
+    In a real system this would query a database. For the hackathon,
+    we return static data that showcases different risk levels.
+    """
+    return [
+        {"claim_id": "CLM-8492", "Provider_ID": "PRV-0007", "Diagnosis_Code": "J06.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 15000, "Unstructured_Notes": "Mild sore throat, prescribed lozenges."},
+        {"claim_id": "CLM-8491", "Provider_ID": "PRV-0013", "Diagnosis_Code": "M54.5",  "Procedure_Code": "99213", "Total_Claim_Amount": 8900,  "Unstructured_Notes": "Patient reports chronic lower back pain. Prescribed NSAIDs."},
+        {"claim_id": "CLM-8490", "Provider_ID": "PRV-0001", "Diagnosis_Code": "E11.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 580,   "Unstructured_Notes": "Routine diabetes management visit. A1C reviewed. Metformin refilled."},
+        {"claim_id": "CLM-8489", "Provider_ID": "PRV-0031", "Diagnosis_Code": "Z00.00", "Procedure_Code": "99213", "Total_Claim_Amount": 12000, "Unstructured_Notes": "Annual physical. No complaints."},
+        {"claim_id": "CLM-8488", "Provider_ID": "PRV-0002", "Diagnosis_Code": "I10",    "Procedure_Code": "93000", "Total_Claim_Amount": 490,   "Unstructured_Notes": "BP 145/92. Adjusted lisinopril dosage. ECG normal."},
+        {"claim_id": "CLM-8487", "Provider_ID": "PRV-0007", "Diagnosis_Code": "N39.0",  "Procedure_Code": "81003", "Total_Claim_Notes": "UTI confirmed by urinalysis. Prescribed trimethoprim.", "Total_Claim_Amount": 5500},
+        {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "Diagnosis_Code": "F32.1",  "Procedure_Code": "90837", "Total_Claim_Amount": 420,   "Unstructured_Notes": "60-minute psychotherapy session. Patient reporting improved mood."},
+        {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 260,   "Unstructured_Notes": "Endoscopy showed mild esophageal irritation. Prescribed PPI."},
+    ]
