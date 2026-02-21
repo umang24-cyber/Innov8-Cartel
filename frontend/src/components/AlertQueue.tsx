@@ -1,5 +1,5 @@
 import type { Claim } from '../types';
-import { ChevronDown, Filter, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Filter, AlertTriangle } from 'lucide-react';
 
 interface AlertQueueProps {
     claims: Claim[];

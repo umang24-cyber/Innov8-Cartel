@@ -1,6 +1,8 @@
 import React from 'react';
 import { LayoutDashboard, AlertCircle, Briefcase, Activity, Settings, Zap } from 'lucide-react';
+import { Link } from "react-router-dom";
 
+<Link to="/overview">Overview</Link>
 const Sidebar: React.FC = () => {
     return (
         <aside className="w-64 h-screen bg-slate-950 border-r border-slate-800 flex flex-col pt-6">

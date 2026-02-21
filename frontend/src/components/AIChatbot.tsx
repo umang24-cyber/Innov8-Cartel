@@ -18,7 +18,7 @@ const initialMessages = [
 
 const AIChatbot: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
-    const [messages, setMessages] = useState<any[]>(initialMessages);
+    const [messages] = useState<any[]>(initialMessages);
     const [input, setInput] = useState('');
 
     const toggleChat = () => setIsOpen(!isOpen);
