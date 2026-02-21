@@ -37,7 +37,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 from typing import Any
-
+from typing import Optional
 import joblib
 import numpy as np
 import pandas as pd
@@ -598,28 +598,91 @@ async def health():
         "shap_ready":   app_state.explainer is not None,
         "groq_ready":   app_state.groq_client is not None,
     }
+class DashboardStats(BaseModel):
+    total_claims: int
+    total_claims_trend: float
+    high_risk_alerts: int
+    high_risk_trend: float
+    false_positive_rate: float
+    false_positive_trend: float
+    pending_investigations: int
+    pending_trend: int
 
+@app.get("/dashboard_stats", response_model=DashboardStats)
+async def get_dashboard_stats():
+    """
+    Returns the top-level metrics for the main dashboard cards.
+    In production, this would run aggregate SQL queries against your database.
+    """
+    return DashboardStats(
+        total_claims=14284,
+        total_claims_trend=12.5,
+        high_risk_alerts=241,
+        high_risk_trend=4.2,
+        false_positive_rate=8.4,
+        false_positive_trend=-2.1,
+        pending_investigations=89,
+        pending_trend=-12
+    )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Demo endpoint — returns pre-built sample claims for the UI demo table
 # ══════════════════════════════════════════════════════════════════════════════
 @app.get("/demo_claims")
-async def demo_claims():
+async def demo_claims(
+    search: Optional[str] = None,
+    sort_by: Optional[str] = "Highest Risk",
+    provider_filter: Optional[str] = None
+):
     """
-    Returns 8 sample claims for the Alert Queue table in the frontend.
-    In a real system this would query a database. For the hackathon,
-    we return static data that showcases different risk levels.
+    Returns sample claims, now supporting search and filtering from the UI.
     """
-    return [
+    claims = [
         {"claim_id": "CLM-8492", "Provider_ID": "PRV-0007", "Diagnosis_Code": "J06.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 15000, "Unstructured_Notes": "Mild sore throat, prescribed lozenges."},
         {"claim_id": "CLM-8491", "Provider_ID": "PRV-0013", "Diagnosis_Code": "M54.5",  "Procedure_Code": "99213", "Total_Claim_Amount": 8900,  "Unstructured_Notes": "Patient reports chronic lower back pain. Prescribed NSAIDs."},
         {"claim_id": "CLM-8490", "Provider_ID": "PRV-0001", "Diagnosis_Code": "E11.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 580,   "Unstructured_Notes": "Routine diabetes management visit. A1C reviewed. Metformin refilled."},
         {"claim_id": "CLM-8489", "Provider_ID": "PRV-0031", "Diagnosis_Code": "Z00.00", "Procedure_Code": "99213", "Total_Claim_Amount": 12000, "Unstructured_Notes": "Annual physical. No complaints."},
         {"claim_id": "CLM-8488", "Provider_ID": "PRV-0002", "Diagnosis_Code": "I10",    "Procedure_Code": "93000", "Total_Claim_Amount": 490,   "Unstructured_Notes": "BP 145/92. Adjusted lisinopril dosage. ECG normal."},
-        {"claim_id": "CLM-8487", "Provider_ID": "PRV-0007", "Diagnosis_Code": "N39.0",  "Procedure_Code": "81003", "Total_Claim_Notes": "UTI confirmed by urinalysis. Prescribed trimethoprim.", "Total_Claim_Amount": 5500},
+        {"claim_id": "CLM-8487", "Provider_ID": "PRV-0007", "Diagnosis_Code": "N39.0",  "Procedure_Code": "81003", "Total_Claim_Amount": 5500,  "Unstructured_Notes": "UTI confirmed by urinalysis. Prescribed trimethoprim."},
         {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "Diagnosis_Code": "F32.1",  "Procedure_Code": "90837", "Total_Claim_Amount": 420,   "Unstructured_Notes": "60-minute psychotherapy session. Patient reporting improved mood."},
         {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 260,   "Unstructured_Notes": "Endoscopy showed mild esophageal irritation. Prescribed PPI."},
     ]
+
+    # Apply Search Logic
+    if search:
+        search_lower = search.lower()
+        claims = [
+            c for c in claims 
+            if search_lower in c["claim_id"].lower() 
+            or search_lower in c["Provider_ID"].lower()
+            or search_lower in c["Diagnosis_Code"].lower()
+        ]
+        
+    # Apply Provider Filter
+    if provider_filter:
+        claims = [c for c in claims if c["Provider_ID"] == provider_filter]
+
+    # Note: Sorting by "Highest Risk" requires running them through the model. 
+    # For a simple UI connection, you can leave the static order, or mock a risk score here.
+
+    return claims
+
+
+from fastapi.responses import JSONResponse
+
+@app.post("/generate_report")
+async def generate_report():
+    """
+    Triggered by the 'Generate Report' button in the UI.
+    Currently returns a success message. 
+    """
+    # TODO: Add PDF or CSV generation logic here
+    return JSONResponse(
+        content={
+            "status": "success", 
+            "message": "Report generation initiated. The file will download shortly."
+        }
+    )
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
