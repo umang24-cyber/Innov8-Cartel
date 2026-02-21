@@ -620,3 +620,12 @@ async def demo_claims():
         {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "Diagnosis_Code": "F32.1",  "Procedure_Code": "90837", "Total_Claim_Amount": 420,   "Unstructured_Notes": "60-minute psychotherapy session. Patient reporting improved mood."},
         {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 260,   "Unstructured_Notes": "Endoscopy showed mild esophageal irritation. Prescribed PPI."},
     ]
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+app.mount("/assets", StaticFiles(directory="../frontend/dist/assets"), name="assets")
+
+@app.get("/{full_path:path}")
+async def serve_react(full_path: str):
+    return FileResponse("../frontend/dist/index.html")
