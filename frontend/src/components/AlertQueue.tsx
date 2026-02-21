@@ -1,5 +1,5 @@
 import type { Claim } from '../types';
-import { ChevronDown, Filter, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Filter, AlertTriangle } from 'lucide-react';
 
 interface AlertQueueProps {
     claims: Claim[];
@@ -9,54 +9,57 @@ interface AlertQueueProps {
 
 const AlertQueue = ({ claims, selectedClaimId, onSelectClaim }: AlertQueueProps) => {
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[calc(100vh-220px)] shadow-lg">
-            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-sm z-10 sticky top-0">
-                <h2 className="text-lg font-semibold text-white flex items-center">
-                    <AlertTriangle className="mr-2 text-rose-500" size={20} />
+        <div className="bg-[#0a1024]/90 backdrop-blur-xl border border-slate-800/80 rounded-2xl overflow-hidden flex flex-col h-[calc(100vh-250px)] shadow-xl shadow-cyan-900/10 relative">
+            <div className="p-5 border-b border-slate-800/80 flex justify-between items-center bg-[#070b19]/60 backdrop-blur-md z-10 sticky top-0">
+                <h2 className="text-lg font-bold text-white flex items-center tracking-wide">
+                    <div className="w-2 h-6 bg-cyan-500 rounded-full mr-3 shadow-[0_0_10px_#06b6d4]"></div>
                     Alert Queue
                 </h2>
-                <div className="flex gap-2">
-                    <button className="flex items-center text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-md transition-colors border border-slate-700">
-                        <Filter size={14} className="mr-2" />
-                        Filter
+                <div className="flex gap-3">
+                    <button className="flex items-center text-sm bg-[#070b19] hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-lg transition-colors border border-slate-700/80 shadow-sm font-medium">
+                        <Filter size={14} className="mr-2 text-cyan-400" />
+                        Filter Filters
                     </button>
-                    <button className="flex items-center text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-md transition-colors border border-slate-700">
-                        Sort by Risk <ChevronDown size={14} className="ml-1 text-slate-400" />
+                    <button className="flex items-center text-sm bg-[#070b19] hover:bg-slate-800 text-slate-300 px-4 py-2 rounded-lg transition-colors border border-slate-700/80 shadow-sm font-medium">
+                        Sort: <span className="text-cyan-400 ml-1">Highest Risk</span> <ChevronDown size={14} className="ml-2 text-slate-500" />
                     </button>
                 </div>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-0">
+            <div className="overflow-y-auto flex-1 p-0 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                 <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-slate-950/80 sticky top-0 z-10 backdrop-blur-md border-b border-slate-800">
+                    <thead className="bg-[#070b19]/90 sticky top-0 z-10 backdrop-blur-md border-b border-slate-800">
                         <tr>
-                            <th className="px-6 py-3 text-slate-400 font-medium uppercase tracking-wider text-xs">Claim ID</th>
-                            <th className="px-6 py-3 text-slate-400 font-medium uppercase tracking-wider text-xs">Provider</th>
-                            <th className="px-6 py-3 text-slate-400 font-medium uppercase tracking-wider text-xs">Diagnosis Code</th>
-                            <th className="px-6 py-3 text-slate-400 font-medium uppercase tracking-wider text-xs">Billed Amount</th>
-                            <th className="px-6 py-3 text-slate-400 font-medium uppercase tracking-wider text-xs text-right">Risk Score</th>
+                            <th className="px-6 py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px]">Claim ID</th>
+                            <th className="px-6 py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px]">Provider</th>
+                            <th className="px-6 py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px]">Diagnosis Code</th>
+                            <th className="px-6 py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px]">Billed Amount</th>
+                            <th className="px-6 py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px] text-right">Risk Score</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/50">
+                    <tbody className="divide-y divide-slate-800/40">
                         {claims.map((claim) => (
                             <tr
                                 key={claim.id}
                                 onClick={() => onSelectClaim(claim.id)}
-                                className={`cursor-pointer transition-colors hover:bg-slate-800/50 ${selectedClaimId === claim.id ? 'bg-slate-800/80 ring-1 ring-inset ring-slate-700' : ''
+                                className={`cursor-pointer transition-all duration-200 hover:bg-slate-800/40 ${selectedClaimId === claim.id ? 'bg-cyan-900/10' : ''
                                     }`}
                             >
-                                <td className="px-6 py-4">
-                                    <span className="text-slate-200 font-mono text-xs bg-slate-950 px-2 py-1 rounded border border-slate-800">
+                                <td className="px-6 py-4 relative">
+                                    {selectedClaimId === claim.id && (
+                                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_10px_#22d3ee]"></div>
+                                    )}
+                                    <span className="text-slate-200 font-mono text-xs bg-[#070b19] px-2 py-1 rounded border border-slate-800 shadow-inner">
                                         {claim.id}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-slate-300 font-medium">{claim.provider}</td>
+                                <td className="px-6 py-4 text-slate-200 font-semibold">{claim.provider}</td>
                                 <td className="px-6 py-4">
-                                    <span className="text-slate-400 bg-slate-950/50 px-2 py-0.5 rounded text-xs border border-slate-800">
+                                    <span className="text-slate-400 bg-slate-900/50 px-2.5 py-1 rounded-md text-[11px] font-mono border border-slate-800/80">
                                         {claim.diagnosisCode}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4 text-slate-300 font-medium text-emerald-400/90 hover:text-emerald-400">
+                                <td className="px-6 py-4 text-slate-200 font-semibold text-cyan-400 tracking-wide hover:text-cyan-300">
                                     ${claim.billedAmount.toLocaleString()}
                                 </td>
                                 <td className="px-6 py-4 flex justify-end">
@@ -72,8 +75,8 @@ const AlertQueue = ({ claims, selectedClaimId, onSelectClaim }: AlertQueueProps)
 };
 
 interface RiskBadgeProps {
-  score: number;
-  level: string;
+    score: number;
+    level: string;
 }
 
 const RiskBadge = ({ score, level }: RiskBadgeProps) => {
@@ -82,11 +85,11 @@ const RiskBadge = ({ score, level }: RiskBadgeProps) => {
     let dotColor = 'bg-slate-500';
 
     if (level === 'Critical') {
-        bgColor = 'bg-rose-500/20';
+        bgColor = 'bg-rose-500/10';
         textColor = 'text-rose-400';
         dotColor = 'bg-rose-500';
     } else if (level === 'High') {
-        bgColor = 'bg-rose-900/40';
+        bgColor = 'bg-rose-900/20';
         textColor = 'text-rose-400';
         dotColor = 'bg-rose-500';
     } else if (level === 'Medium') {
@@ -94,14 +97,14 @@ const RiskBadge = ({ score, level }: RiskBadgeProps) => {
         textColor = 'text-amber-400';
         dotColor = 'bg-amber-400';
     } else if (level === 'Low') {
-        bgColor = 'bg-emerald-500/10';
-        textColor = 'text-emerald-400';
-        dotColor = 'bg-emerald-400';
+        bgColor = 'bg-cyan-500/10';
+        textColor = 'text-cyan-400';
+        dotColor = 'bg-cyan-400';
     }
 
     return (
-        <div className={`px-3 py-1 rounded-full text-xs font-bold border border-${level === 'Critical' ? 'rose-500/50' : 'transparent'} ${bgColor} ${textColor} flex items-center shadow-sm w-fit`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${dotColor} mr-2 shadow-[0_0_8px_currentColor]`}></span>
+        <div className={`px-3 py-1.5 rounded-full text-xs font-bold border ${level === 'Critical' ? 'border-rose-500/30' : 'border-transparent'} ${bgColor} ${textColor} flex items-center shadow-sm w-fit`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${dotColor} mr-2 ${level === 'Critical' ? 'shadow-[0_0_8px_#f43f5e]' : ''} ${level === 'Low' ? 'shadow-[0_0_8px_#22d3ee]' : ''}`}></span>
             {score}% - {level}
         </div>
     );

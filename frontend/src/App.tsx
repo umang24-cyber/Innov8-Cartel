@@ -72,27 +72,31 @@ function App() {
     const selectedClaim = mockClaims.find(c => c.id === selectedClaimId) || null;
 
     return (
-        <div className="flex bg-slate-950 min-h-screen text-slate-300 font-sans selection:bg-emerald-500/30">
+        <div className="flex bg-[#030614] min-h-screen text-slate-300 font-sans selection:bg-cyan-500/30 selection:text-cyan-50 overflow-hidden">
             <Sidebar />
 
-            <main className="flex-1 flex flex-col h-screen overflow-hidden">
+            <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+                {/* Background ambient glow matching Tookitaki design */}
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-900/10 rounded-full blur-[120px] pointer-events-none"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-900/10 rounded-full blur-[100px] pointer-events-none"></div>
+
                 {/* Top Header Section */}
-                <header className="px-8 py-6 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md z-10 sticky top-0">
+                <header className="px-8 py-6 border-b border-slate-800/60 bg-[#070b19]/80 backdrop-blur-xl z-10 sticky top-0 shadow-sm shadow-cyan-900/5">
                     <div className="flex justify-between items-center mb-6">
                         <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tight">Case Manager</h1>
-                            <p className="text-slate-400 text-sm mt-1">Real-time anomaly detection and investigation.</p>
+                            <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-slate-400 tracking-tight">Case Manager</h1>
+                            <p className="text-cyan-400/80 text-sm mt-1.5 font-medium tracking-wide">Real-time anomaly detection and investigation.</p>
                         </div>
                         <div className="flex items-center gap-4">
-                            <div className="flex items-center bg-slate-900 border border-slate-700 rounded-full px-4 py-1.5 focus-within:ring-1 focus-within:ring-emerald-500 focus-within:border-emerald-500 transition-all">
-                                <span className="text-slate-500 text-sm mr-2">🔍</span>
+                            <div className="flex items-center bg-[#0a1024] border border-slate-700/80 rounded-full px-4 py-2 focus-within:ring-1 focus-within:ring-cyan-500/50 focus-within:border-cyan-500/50 transition-all shadow-inner">
+                                <span className="text-slate-500 text-sm mr-2 opacity-80">🔍</span>
                                 <input
                                     type="text"
                                     placeholder="Search claims, IDs..."
-                                    className="bg-transparent border-none text-sm text-white focus:outline-none w-48 placeholder:text-slate-500"
+                                    className="bg-transparent border-none text-sm text-white focus:outline-none w-56 placeholder:text-slate-600 font-medium"
                                 />
                             </div>
-                            <button className="bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                            <button className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-5 py-2 rounded-lg text-sm font-bold transition-all shadow-[0_0_15px_rgba(34,211,238,0.25)] hover:shadow-[0_0_25px_rgba(34,211,238,0.4)] transform hover:-translate-y-0.5 border border-cyan-400/20">
                                 Generate Report
                             </button>
                         </div>
@@ -101,9 +105,9 @@ function App() {
                 </header>
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex overflow-hidden p-8 gap-8 relative bg-slate-950">
+                <div className="flex-1 flex overflow-hidden p-8 gap-8 relative z-10">
                     {/* Main Table Container */}
-                    <div className={`flex-1 transition-all duration-300 ease-in-out`}>
+                    <div className={`flex-1 transition-all duration-500 ease-in-out`}>
                         <AlertQueue
                             claims={mockClaims}
                             selectedClaimId={selectedClaimId}

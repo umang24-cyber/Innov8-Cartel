@@ -34,10 +34,10 @@ const metrics: Metric[] = [
 ];
 
 const icons = [
-    <Activity className="text-emerald-400" size={24} />,
+    <Activity className="text-cyan-400" size={24} />,
     <ShieldAlert className="text-rose-500" size={24} />,
-    <Target className="text-emerald-400" size={24} />,
-    <Users className="text-amber-400" size={24} />,
+    <Target className="text-blue-400" size={24} />,
+    <Users className="text-indigo-400" size={24} />,
 ];
 
 const HeaderKPIs: React.FC = () => {
@@ -46,29 +46,29 @@ const HeaderKPIs: React.FC = () => {
             {metrics.map((metric, index) => (
                 <div
                     key={index}
-                    className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-colors"
+                    className="bg-[#0a1024]/80 backdrop-blur-xl border border-slate-800/80 rounded-2xl p-6 shadow-lg shadow-cyan-900/5 relative overflow-hidden group hover:border-cyan-500/30 transition-all duration-300 transform hover:-translate-y-1"
                 >
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-sm font-medium text-slate-400 mb-1">{metric.label}</p>
-                            <h3 className="text-3xl font-bold text-white tracking-tight">{metric.value}</h3>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">{metric.label}</p>
+                            <h3 className="text-3xl font-extrabold text-white tracking-tight">{metric.value}</h3>
                         </div>
-                        <div className={`p-2 rounded-lg bg-slate-950/50`}>
+                        <div className="p-3 rounded-xl bg-[#070b19] border border-slate-800 shadow-inner">
                             {icons[index]}
                         </div>
                     </div>
                     <div className="mt-4 flex items-center">
                         <span
-                            className={`text-sm font-semibold flex items-center ${metric.isGood ? 'text-emerald-400' : 'text-rose-500'
+                            className={`text-sm font-bold flex items-center px-2 py-0.5 rounded-md ${metric.isGood ? 'bg-cyan-500/10 text-cyan-400 bg-opacity-20' : 'bg-rose-500/10 text-rose-400'
                                 }`}
                         >
-                            {metric.trendDirection === 'up' ? '↑' : '↓'} {metric.trend}
+                            {metric.trendDirection === 'up' ? '↗' : '↘'} {metric.trend}
                         </span>
-                        <span className="text-sm text-slate-500 ml-2">vs last week</span>
+                        <span className="text-xs text-slate-500 ml-3 font-medium">vs last week</span>
                     </div>
 
                     {/* Subtle glow effect on hover */}
-                    <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-slate-800 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 </div>
             ))}
         </div>
