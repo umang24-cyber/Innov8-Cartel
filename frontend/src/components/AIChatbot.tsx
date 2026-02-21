@@ -140,7 +140,7 @@ const AIChatbot: React.FC<AIChatbotProps> = ({ currentClaim }) => {
     }
 
     return (
-        <div className="fixed bottom-8 right-8 w-[400px] bg-white dark:bg-slate-800 backdrop-blur-3xl border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-8 duration-300">
+        <div className="fixed bottom-8 right-8 w-[400px] max-h-[80vh] bg-white dark:bg-slate-800 backdrop-blur-3xl border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-8 duration-300">
             {/* Header */}
             <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500"></div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Edit2, Trash2, ToggleLeft, ToggleRight, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, ToggleLeft, ToggleRight, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import type { Typology } from '../types';
 import { api } from '../services/api';
 import { Modal } from '../components/ui/Modal';
@@ -9,6 +9,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { EmptyState } from '../components/ui/EmptyState';
 import { toast } from '../utils/toast';
 import { formatDate } from '../utils/format';
+import GaussianBellCurve from '../components/GaussianBellCurve';
 
 export const TypologyStudio: React.FC = () => {
   const [typologies, setTypologies] = useState<Typology[]>([]);
@@ -17,6 +18,7 @@ export const TypologyStudio: React.FC = () => {
   const [editingTypology, setEditingTypology] = useState<Typology | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
+  const [isGaussianOpen, setIsGaussianOpen] = useState(true);
 
   useEffect(() => {
     loadTypologies();
@@ -82,15 +84,32 @@ export const TypologyStudio: React.FC = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const severityColors = {
-    Low: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    Medium: 'bg-amber-50 text-amber-700 border-amber-200',
-    High: 'bg-orange-50 text-orange-700 border-orange-200',
-    Critical: 'bg-rose-50 text-rose-700 border-rose-200',
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-y-auto h-full pb-8 pr-2">
+      {/* Gaussian Bell Curve Section — Default Fraud Detection Method */}
+      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden transition-all duration-300">
+        <button
+          onClick={() => setIsGaussianOpen(!isGaussianOpen)}
+          className="w-full p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center rounded-xl text-white shadow-sm">
+              <span className="text-lg font-black">𝒩</span>
+            </div>
+            <div className="text-left">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Gaussian Distribution Analysis</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Normal (Bell Curve) Law — Default Statistical Fraud Detection Method</p>
+            </div>
+          </div>
+          {isGaussianOpen ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+        </button>
+        <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isGaussianOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className="px-6 pb-6">
+            <GaussianBellCurve />
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -127,11 +146,10 @@ export const TypologyStudio: React.FC = () => {
             <button
               key={filter}
               onClick={() => setFilterActive(filter)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                filterActive === filter
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${filterActive === filter
                   ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-slate-100 shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-              }`}
+                }`}
             >
               {filter.charAt(0).toUpperCase() + filter.slice(1)}
             </button>

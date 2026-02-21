@@ -17,8 +17,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
                 <div className="bg-gradient-to-br from-teal-500 to-cyan-600 p-1.5 rounded-lg mr-3 shadow-[0_0_15px_rgba(20,184,166,0.2)]">
                     <ShieldPlus className="text-white w-6 h-6" />
                 </div>
-                <h1 className="text-xl font-extrabold tracking-wide text-slate-800 flex items-center">
-                    Veri<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600">Claim</span>
+                <h1 className="text-xl font-extrabold tracking-wide text-slate-800 dark:text-white flex items-center">
+                    Veri<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-teal-400 dark:to-cyan-400">Claim</span>
                 </h1>
             </div>
 

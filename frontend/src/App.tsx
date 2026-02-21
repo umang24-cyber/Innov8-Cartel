@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import AlertQueue from './components/AlertQueue';
 import ExplainabilityPanel from './components/ExplainabilityPanel';
 import AIChatbot from './components/AIChatbot';
+import DisclaimerModal from './components/DisclaimerModal';
 import { Overview } from './pages/Overview';
 import { TypologyStudio } from './pages/TypologyStudio';
 import { CaseManager } from './pages/CaseManager';
@@ -15,11 +16,26 @@ import { toast } from './utils/toast';
 function App() {
     const { theme, toggleTheme } = useTheme();
     const [currentView, setCurrentView] = useState<ViewState>('overview');
+    const [prevView, setPrevView] = useState<ViewState>('overview');
+    const [isTransitioning, setIsTransitioning] = useState(false);
     const [claims, setClaims] = useState<Claim[]>([]);
     const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
     const [isLoadingInit, setIsLoadingInit] = useState(true);
     const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    // Smooth tab transition handler
+    const handleViewChange = (view: ViewState) => {
+        if (view === currentView) return;
+        setIsTransitioning(true);
+        setPrevView(currentView);
+        // Short delay — fade out, switch, fade in
+        setTimeout(() => {
+            setCurrentView(view);
+            setSelectedClaimId(null); // reset selection on tab switch
+            setTimeout(() => setIsTransitioning(false), 50);
+        }, 200);
+    };
 
     // Initial Fetch
     const fetchClaims = async () => {
@@ -30,14 +46,12 @@ function App() {
             if (data && data.length > 0) {
                 setClaims(data);
             } else {
-                // Don't set error if we get empty array - just show empty state
                 setClaims([]);
             }
         } catch (err) {
             console.error("Failed to load claims", err);
-            // Set error but don't prevent UI from rendering
             setError("Cannot connect to VeriClaim AI Core (localhost:8000). Please start the backend server.");
-            setClaims([]); // Set empty array so UI can still render
+            setClaims([]);
         } finally {
             setIsLoadingInit(false);
         }
@@ -47,48 +61,70 @@ function App() {
         fetchClaims();
     }, []);
 
-    const handleSelectClaim = async (id: string) => {
+    // FIXED: Only opens the detail panel — does NOT auto-trigger /analyze_claim
+    const handleSelectClaim = (id: string) => {
         if (selectedClaimId === id) {
             setSelectedClaimId(null);
             return;
         }
-
-        const claim = claims.find(c => c.claim_id === id);
-        if (!claim) return;
-
         setSelectedClaimId(id);
+    };
 
-        // If the claim hasn't been scored by the ML yet, trigger the API
-        if (claim.riskScore === undefined && !analyzingClaimId) {
-            setAnalyzingClaimId(id);
-            try {
-                const result = await api.analyzeClaim(claim);
+    // Called explicitly by the "Investigate" button in the ExplainabilityPanel
+    const handleInvestigateClaim = async (id: string) => {
+        const claim = claims.find(c => c.claim_id === id);
+        if (!claim || analyzingClaimId) return;
 
-                // Update the claim in state with ML results
-                setClaims(prev => prev.map(c =>
-                    c.claim_id === id
-                        ? {
-                            ...c,
-                            riskScore: result.risk_score,
-                            riskLevel: result.risk_label === 'HIGH' ? 'High' : 
-                                      result.risk_label === 'MEDIUM' ? 'Medium' : 
-                                      result.risk_label === 'LOW' ? 'Low' : 'Low',
-                            shapValues: result.shap_details,
-                            llmAnalysis: result.llm_text_analysis,
-                            diagnosisStats: result.diagnosis_stats,
-                            anomalyScore: result.anomaly_score,
-                            benfordScore: result.benford_score,
-                            benfordAnalysis: result.benford_analysis,
-                            status: result.risk_score > 60 ? 'Investigating' : 'Pending'
-                        }
-                        : c
-                ));
-            } catch (err) {
-                console.error("Failed to analyze claim", err);
-            } finally {
-                setAnalyzingClaimId(null);
-            }
+        setAnalyzingClaimId(id);
+        try {
+            const result = await api.analyzeClaim(claim);
+            setClaims(prev => prev.map(c =>
+                c.claim_id === id
+                    ? {
+                        ...c,
+                        riskScore: result.risk_score,
+                        riskLevel: result.risk_label === 'HIGH' ? 'High' :
+                            result.risk_label === 'MEDIUM' ? 'Medium' :
+                                result.risk_label === 'LOW' ? 'Low' : 'Low',
+                        shapValues: result.shap_details,
+                        llmAnalysis: result.llm_text_analysis,
+                        diagnosisStats: result.diagnosis_stats,
+                        anomalyScore: result.anomaly_score,
+                        benfordScore: result.benford_score,
+                        benfordAnalysis: result.benford_analysis,
+                        status: result.risk_score > 60 ? 'Investigating' : 'Pending'
+                    }
+                    : c
+            ));
+            toast.success(`Claim ${id} analyzed successfully`);
+        } catch (err) {
+            console.error("Failed to analyze claim", err);
+            toast.error("Failed to analyze claim. Is the backend running?");
+        } finally {
+            setAnalyzingClaimId(null);
         }
+    };
+
+    // Called by the "Clear Claim" button
+    const handleClearClaim = (id: string) => {
+        setClaims(prev => prev.map(c =>
+            c.claim_id === id
+                ? {
+                    ...c,
+                    riskScore: undefined,
+                    riskLevel: undefined,
+                    shapValues: undefined,
+                    llmAnalysis: undefined,
+                    diagnosisStats: undefined,
+                    anomalyScore: undefined,
+                    benfordScore: undefined,
+                    benfordAnalysis: undefined,
+                    status: 'Cleared'
+                }
+                : c
+        ));
+        setSelectedClaimId(null);
+        toast.info(`Claim ${id} cleared`);
     };
 
     const selectedClaim = claims.find(c => c.claim_id === selectedClaimId) || null;
@@ -96,7 +132,10 @@ function App() {
     return (
         <div className="flex bg-slate-50 dark:bg-slate-900 min-h-screen text-slate-900 dark:text-slate-100 font-sans selection:bg-teal-500/30 selection:text-teal-900 overflow-hidden relative transition-colors duration-200">
 
-            <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+            {/* Legal Disclaimer Popup */}
+            <DisclaimerModal />
+
+            <Sidebar currentView={currentView} onViewChange={handleViewChange} />
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
                 {/* Background Elements */}
@@ -107,7 +146,7 @@ function App() {
                 <header className="px-8 py-6 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl z-10 sticky top-0 shadow-sm">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-cyan-600 dark:from-teal-400 dark:to-cyan-400 tracking-tight">
+                            <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-cyan-600 dark:from-teal-400 dark:to-cyan-400 tracking-tight transition-all duration-300">
                                 {currentView === 'overview' && 'Dashboard Overview'}
                                 {currentView === 'queue' && 'Live Alert Queue'}
                                 {currentView === 'case_manager' && 'Case Manager'}
@@ -122,7 +161,7 @@ function App() {
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={toggleTheme}
-                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors"
+                                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95"
                                 aria-label="Toggle theme"
                             >
                                 {theme === 'dark' ? (
@@ -136,7 +175,7 @@ function App() {
                                     fetchClaims();
                                     toast.success('Data refreshed');
                                 }}
-                                className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-md shadow-teal-500/20 hover:shadow-lg transform hover:-translate-y-0.5 flex items-center gap-2"
+                                className="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all shadow-md shadow-teal-500/20 hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2"
                             >
                                 <RefreshCw size={14} />
                                 Refresh
@@ -145,21 +184,21 @@ function App() {
                     </div>
                 </header>
 
-                {/* Main Content Area */}
-                <div className="flex-1 overflow-hidden p-6 relative z-10">
+                {/* Main Content Area with smooth transitions */}
+                <div className={`flex-1 overflow-hidden p-6 relative z-10 transition-all duration-300 ease-in-out ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
                     {error && (
-                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                            <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-red-100 dark:border-red-900 max-w-md text-center">
+                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
+                            <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-red-100 dark:border-red-900 max-w-md text-center transform animate-in zoom-in-95 duration-300">
                                 <div className="w-16 h-16 bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <Activity size={32} />
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">Connection Error</h2>
                                 <p className="text-slate-600 dark:text-slate-400 font-medium mb-6">{error}</p>
                                 <div className="flex gap-3 justify-center">
-                                    <button onClick={fetchClaims} className="bg-teal-600 text-white px-6 py-2 rounded-xl font-bold shadow-md hover:bg-teal-500 transition-colors">
+                                    <button onClick={fetchClaims} className="bg-teal-600 text-white px-6 py-2 rounded-xl font-bold shadow-md hover:bg-teal-500 transition-all active:scale-95">
                                         Retry Connection
                                     </button>
-                                    <button onClick={() => setError(null)} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-6 py-2 rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">
+                                    <button onClick={() => setError(null)} className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-6 py-2 rounded-xl font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition-all active:scale-95">
                                         Continue Anyway
                                     </button>
                                 </div>
@@ -169,10 +208,10 @@ function App() {
 
                     {/* Page Routing */}
                     {currentView === 'overview' && <Overview />}
-                    
+
                     {currentView === 'queue' && (
                         <div className="flex gap-6 h-full">
-                            <div className="flex-1">
+                            <div className={`transition-all duration-400 ease-in-out ${selectedClaimId ? 'flex-1' : 'flex-1'}`}>
                                 <AlertQueue
                                     claims={claims}
                                     selectedClaimId={selectedClaimId}
@@ -180,12 +219,17 @@ function App() {
                                     isLoadingId={analyzingClaimId}
                                 />
                             </div>
-                            {selectedClaimId && (
-                                <ExplainabilityPanel
-                                    claim={selectedClaim}
-                                    onClose={() => setSelectedClaimId(null)}
-                                />
-                            )}
+                            <div className={`transition-all duration-400 ease-in-out transform ${selectedClaimId ? 'translate-x-0 opacity-100 w-[400px]' : 'translate-x-8 opacity-0 w-0 overflow-hidden'}`}>
+                                {selectedClaimId && (
+                                    <ExplainabilityPanel
+                                        claim={selectedClaim}
+                                        onClose={() => setSelectedClaimId(null)}
+                                        onInvestigate={handleInvestigateClaim}
+                                        onClear={handleClearClaim}
+                                        isAnalyzing={analyzingClaimId === selectedClaimId}
+                                    />
+                                )}
+                            </div>
                         </div>
                     )}
 
