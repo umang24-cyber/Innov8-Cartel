@@ -105,7 +105,7 @@ const GaussianBellCurve: React.FC<GaussianBellCurveProps> = ({
     };
 
     return (
-        <div className="space-y-6 overflow-hidden">
+        <div className="space-y-6">
             {/* Controls */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -186,7 +186,7 @@ const GaussianBellCurve: React.FC<GaussianBellCurveProps> = ({
                 </div>
                 <div className="h-72 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                        <AreaChart data={data} margin={{ top: 25, right: 50, left: 20, bottom: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
                             <XAxis
                                 dataKey="x"

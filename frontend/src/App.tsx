@@ -179,7 +179,7 @@ function App() {
                         </div>
                         <div className="flex items-center gap-3">
                             {/* Notification Bell */}
-                            <div className="relative" ref={notifRef}>
+                            <div className="relative z-[9999]" ref={notifRef}>
                                 <button
                                     onClick={() => setShowNotifications(!showNotifications)}
                                     className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 relative"
