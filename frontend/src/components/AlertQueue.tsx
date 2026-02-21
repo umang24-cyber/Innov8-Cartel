@@ -7,7 +7,7 @@ interface AlertQueueProps {
     onSelectClaim: (id: string) => void;
 }
 
-const AlertQueue: React.FC<AlertQueueProps> = ({ claims, selectedClaimId, onSelectClaim }) => {
+const AlertQueue = ({ claims, selectedClaimId, onSelectClaim }: AlertQueueProps) => {
     return (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col h-[calc(100vh-220px)] shadow-lg">
             <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-sm z-10 sticky top-0">
@@ -71,7 +71,12 @@ const AlertQueue: React.FC<AlertQueueProps> = ({ claims, selectedClaimId, onSele
     );
 };
 
-const RiskBadge: React.FC<{ score: number; level: string }> = ({ score, level }) => {
+interface RiskBadgeProps {
+  score: number;
+  level: string;
+}
+
+const RiskBadge = ({ score, level }: RiskBadgeProps) => {
     let bgColor = 'bg-slate-800';
     let textColor = 'text-slate-300';
     let dotColor = 'bg-slate-500';

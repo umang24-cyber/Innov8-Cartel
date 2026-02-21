@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import HeaderKPIs from './components/HeaderKPIs';
 import AlertQueue from './components/AlertQueue';
 import ExplainabilityPanel from './components/ExplainabilityPanel';
 import AIChatbot from './components/AIChatbot';
-import { Claim } from './types';
+import type { Claim } from './types';
 
 // Mock Data
 const mockClaims: Claim[] = [
