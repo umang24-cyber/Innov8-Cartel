@@ -14,17 +14,16 @@ ARCHITECTURE OVERVIEW:
            │   → Returns top feature contribution as human-readable text
            │   → Critical for the "glass-box" explainability panel in the UI
            │
-  Layer C │ Groq LLM (llama-3.3-70b)
-           │   → Reads the unstructured doctor's note
-           │   → Acts as a medical auditor: does the note justify the bill?
-           │   → Returns 1-2 sentence finding + detailed SHAP breakdown
+  Layer C │ Groq LLM (llama-3.3-70b) & Mega LLM (glm-4.7)
+           │   → Groq reads unstructured doctor's notes for clinical audits
+           │   → Mega LLM powers the interactive investigator Chatbot
 
 IMPORTANT: This is ADVISORY ONLY. No automated decisions are made.
            A human investigator reviews every flagged claim.
 
 Prerequisites:
     pip install -r requirements.txt
-    Set GROQ_API_KEY in a .env file or environment variable
+    Set GROQ_API_KEY and MEGA_LLM_API_KEY in a .env file or environment variable
 
 Run:
     uvicorn main:app --reload --port 8000
@@ -34,7 +33,7 @@ API Docs (auto-generated):
 """
 
 import os
-import io # <-- NEW IMPORT
+import io
 import logging
 from contextlib import asynccontextmanager
 from typing import Any, Optional
@@ -44,12 +43,13 @@ import numpy as np
 import pandas as pd
 import shap
 from groq import Groq
+from openai import OpenAI  # <-- NEW IMPORT FOR MEGA LLM
 import math
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, File, UploadFile # <-- UPDATED
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse # <-- UPDATED
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
 
@@ -66,6 +66,7 @@ log = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+MEGA_LLM_API_KEY = os.getenv("MEGA_LLM_API_KEY", "") # <-- ADDED MEGA LLM KEY
 MODEL_PATH   = "fraud_model.joblib"
 
 # MUST match train_model.py exactly — same column names, same order
@@ -101,11 +102,12 @@ class AppState:
     The pipeline and SHAP explainer each take several seconds to initialize —
     doing this once at startup keeps API latency low.
     """
-    pipeline:     Any       = None   # the full fitted imblearn Pipeline
-    explainer:    Any       = None   # SHAP TreeExplainer around the RF
-    feature_names: list[str] = []    # OHE-expanded feature names
-    groq_client:  Any       = None   # Groq API client
-    isolation_forest: Any   = None   # Isolation Forest for anomaly detection
+    pipeline:         Any       = None   # the full fitted imblearn Pipeline
+    explainer:        Any       = None   # SHAP TreeExplainer around the RF
+    feature_names:    list[str] = []     # OHE-expanded feature names
+    groq_client:      Any       = None   # Groq API client (for Clinical Audit)
+    llm_client:       Any       = None   # Mega LLM client (for Chatbot)
+    isolation_forest: Any       = None   # Isolation Forest for anomaly detection
     historical_claims: pd.DataFrame = None  # Historical data for Benford's Law
 
 
@@ -153,12 +155,22 @@ async def lifespan(app_instance):
     )
     log.info("✅  SHAP TreeExplainer ready")
 
-    # ── Initialize Groq client ────────────────────────────────────────────
+    # ── Initialize Groq client (Clinical Audit) ───────────────────────────
     if GROQ_API_KEY:
         app_state.groq_client = Groq(api_key=GROQ_API_KEY)
         log.info("✅  Groq client initialized")
     else:
-        log.warning("⚠️  GROQ_API_KEY not set — LLM analysis will be skipped")
+        log.warning("⚠️  GROQ_API_KEY not set — Groq clinical audit will be skipped")
+
+    # ── Initialize Mega LLM client (Chatbot) ──────────────────────────────
+    if MEGA_LLM_API_KEY:
+        app_state.llm_client = OpenAI(
+            base_url="https://ai.megallm.io/v1",
+            api_key=MEGA_LLM_API_KEY
+        )
+        log.info("✅  Mega LLM client initialized")
+    else:
+        log.warning("⚠️  MEGA_LLM_API_KEY not set — Mega Chatbot will be skipped")
 
     # ── Initialize Isolation Forest for anomaly detection ─────────────────
     # Load historical claims data to train the Isolation Forest
@@ -484,7 +496,13 @@ Respond in exactly 3 sentences. Be specific about amounts, codes, and clinical r
             temperature=0.1,      # very low → factual, consistent, reproducible
             max_tokens=250,       # enforce brevity for the UI panel
         )
-        return response.choices[0].message.content.strip()
+        
+        content = response.choices[0].message.content
+        if content is not None:
+            return content.strip()
+        else:
+            log.warning(f"BLANK CONTENT. Full response: {response}")
+            return "Groq returned a blank response. Check terminal for raw data."
 
     except Exception as exc:
         log.error(f"Groq API error: {exc}")
@@ -737,8 +755,9 @@ async def chat(req: ChatRequest):
     The claim_context (if provided) is injected into the system prompt
     so the AI can answer specifically about the current claim being viewed.
     """
-    if not app_state.groq_client:
-        return ChatResponse(reply="Groq API not configured. Please set GROQ_API_KEY.")
+    # ── UPDATED TO USE MEGA LLM CLIENT ──
+    if not app_state.llm_client:
+        return ChatResponse(reply="Mega LLM API not configured. Please set MEGA_LLM_API_KEY.")
 
     # Build context block if claim data is attached
     context_block = ""
@@ -763,18 +782,27 @@ Be concise, helpful, and always remind investigators that you are advisory only.
 Never recommend claim rejection — only flag items for human review."""
 
     try:
-        response = app_state.groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        response = app_state.llm_client.chat.completions.create(
+            model="glm-4.7",
             messages=[
                 {"role": "system",  "content": system},
                 {"role": "user",    "content": req.message},
             ],
-            temperature=0.3,
-            max_tokens=300,
+            temperature=0.7,
+            max_tokens=8192,
         )
-        return ChatResponse(reply=response.choices[0].message.content.strip())
+        
+        # SAFELY extract the content to prevent NoneType crash
+        content = response.choices[0].message.content
+        
+        if content is not None:
+            return ChatResponse(reply=content.strip())
+        else:
+            log.warning(f"BLANK CONTENT IN CHAT. Full response: {response}")
+            return ChatResponse(reply="API Error: The AI returned a blank response. Check terminal for raw data.")
+            
     except Exception as exc:
-        log.error(f"Chat Groq error: {exc}")
+        log.error(f"Chat Mega LLM error: {exc}")
         return ChatResponse(reply=f"Error: {str(exc)[:150]}")
 
 
@@ -792,6 +820,7 @@ async def health():
         "model_loaded": app_state.pipeline  is not None,
         "shap_ready":   app_state.explainer is not None,
         "groq_ready":   app_state.groq_client is not None,
+        "mega_llm_ready": app_state.llm_client is not None,
     }
 class DashboardStats(BaseModel):
     total_claims: int
