@@ -2,6 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { toast } from "./utils/toast";
+
+// Initialize toast system
+if (typeof window !== 'undefined') {
+  toast.init();
+}
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<

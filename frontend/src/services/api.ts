@@ -1,4 +1,4 @@
-import type { Claim } from '../types';
+import type { Claim, Case, Typology, DashboardStats, FraudTrend, RiskDistribution } from '../types';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -16,6 +16,30 @@ export const api = {
         } catch (error) {
             console.error('API Error:', error);
             return []; // Return empty array on failure so UI doesn't crash
+        }
+    },
+
+    // Get all claims
+    getClaims: async (): Promise<Claim[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/claims`);
+            if (!res.ok) throw new Error('Failed to fetch claims');
+            return await res.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            return [];
+        }
+    },
+
+    // Get single claim
+    getClaim: async (id: string): Promise<Claim | null> => {
+        try {
+            const res = await fetch(`${API_BASE}/claims/${id}`);
+            if (!res.ok) throw new Error('Failed to fetch claim');
+            return await res.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            return null;
         }
     },
 
@@ -72,7 +96,7 @@ export const api = {
     },
 
     // 4. Get Dashboard Stats
-    getStats: async () => {
+    getStats: async (): Promise<DashboardStats | null> => {
         try {
             const res = await fetch(`${API_BASE}/dashboard_stats`);
             if (!res.ok) throw new Error('Failed to fetch stats');
@@ -81,5 +105,152 @@ export const api = {
             console.error("API Error:", error);
             return null;
         }
-    }
+    },
+
+    // 5. Get Fraud Trends
+    getFraudTrends: async (): Promise<FraudTrend[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/fraud_trends`);
+            if (!res.ok) throw new Error('Failed to fetch trends');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            return [];
+        }
+    },
+
+    // 6. Get Risk Distribution
+    getRiskDistribution: async (): Promise<RiskDistribution[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/risk_distribution`);
+            if (!res.ok) throw new Error('Failed to fetch distribution');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            return [];
+        }
+    },
+
+    // 7. Cases
+    getCases: async (): Promise<Case[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/cases`);
+            if (!res.ok) throw new Error('Failed to fetch cases');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            return [];
+        }
+    },
+
+    getCase: async (id: string): Promise<Case | null> => {
+        try {
+            const res = await fetch(`${API_BASE}/cases/${id}`);
+            if (!res.ok) throw new Error('Failed to fetch case');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            return null;
+        }
+    },
+
+    updateCase: async (id: string, updates: Partial<Case>): Promise<Case> => {
+        try {
+            const res = await fetch(`${API_BASE}/cases/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates),
+            });
+            if (!res.ok) throw new Error('Failed to update case');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            throw error;
+        }
+    },
+
+    addCaseNote: async (id: string, content: string): Promise<void> => {
+        try {
+            const res = await fetch(`${API_BASE}/cases/${id}/notes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content }),
+            });
+            if (!res.ok) throw new Error('Failed to add note');
+        } catch (error) {
+            console.error("API Error:", error);
+            throw error;
+        }
+    },
+
+    // 8. Typologies
+    getTypologies: async (): Promise<Typology[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/typologies`);
+            if (!res.ok) throw new Error('Failed to fetch typologies');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            return [];
+        }
+    },
+
+    createTypology: async (data: Partial<Typology>): Promise<Typology> => {
+        try {
+            const res = await fetch(`${API_BASE}/typologies`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error('Failed to create typology');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            throw error;
+        }
+    },
+
+    updateTypology: async (id: string, data: Partial<Typology>): Promise<Typology> => {
+        try {
+            const res = await fetch(`${API_BASE}/typologies/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error('Failed to update typology');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            throw error;
+        }
+    },
+
+    deleteTypology: async (id: string): Promise<void> => {
+        try {
+            const res = await fetch(`${API_BASE}/typologies/${id}`, {
+                method: 'DELETE',
+            });
+            if (!res.ok) throw new Error('Failed to delete typology');
+        } catch (error) {
+            console.error("API Error:", error);
+            throw error;
+        }
+    },
+
+    // 9. AI Explain
+    explainRisk: async (claimId: string, question?: string): Promise<string> => {
+        try {
+            const res = await fetch(`${API_BASE}/ai/explain`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ claim_id: claimId, question }),
+            });
+            if (!res.ok) throw new Error('Failed to get explanation');
+            const data = await res.json();
+            return data.explanation || '';
+        } catch (error) {
+            console.error("API Error:", error);
+            throw error;
+        }
+    },
 };

@@ -9,7 +9,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
     return (
-        <aside className="w-64 h-screen bg-slate-50 border-r border-slate-200 flex flex-col pt-6 relative overflow-hidden transition-all duration-300 shadow-xl z-20">
+        <aside className="w-64 h-screen bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-700 flex flex-col pt-6 relative overflow-hidden transition-all duration-300 shadow-xl z-20">
             {/* Ambient background glow */}
             <div className="absolute top-0 left-0 w-full h-32 bg-teal-500/5 blur-3xl pointer-events-none"></div>
 
@@ -29,7 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
                 <NavItem icon={<Activity size={20} />} label="Typology Studio" active={currentView === 'typology'} onClick={() => onViewChange('typology')} />
             </nav>
 
-            <div className="p-4 mt-auto border-t border-slate-200 relative z-10 bg-slate-50/80 backdrop-blur-md">
+            <div className="p-4 mt-auto border-t border-slate-200 dark:border-slate-700 relative z-10 bg-slate-50/80 dark:bg-slate-800/80 backdrop-blur-md">
                 <NavItem icon={<Settings size={20} />} label="Settings" active={currentView === 'settings'} onClick={() => onViewChange('settings')} />
                 <div className="mt-4 flex items-center px-2 py-2 rounded-xl bg-white border border-slate-200 shadow-sm transition-all hover:border-teal-300 hover:shadow-md cursor-pointer">
                     <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600">
@@ -60,8 +60,8 @@ const NavItem: React.FC<NavItemProps> = ({ icon, label, active, badge, onClick }
     <button
         onClick={onClick}
         className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${active
-            ? 'bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 border border-teal-200 shadow-sm hover:shadow-md'
-            : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-700'
+            ? 'bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/30 dark:to-cyan-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700 shadow-sm hover:shadow-md'
+            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
     >
         <div className="flex items-center gap-3">

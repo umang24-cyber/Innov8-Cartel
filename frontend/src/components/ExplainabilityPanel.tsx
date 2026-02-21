@@ -33,21 +33,21 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
     };
 
     return (
-        <div className="w-[400px] bg-white/95 backdrop-blur-2xl border-l border-slate-200 h-[calc(100vh-250px)] flex flex-col shadow-[-20px_0_40px_rgba(0,0,0,0.05)] transform transition-transform duration-300 translate-x-0 relative z-20 rounded-r-2xl">
+        <div className="w-[400px] bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl border-l border-slate-200 dark:border-slate-700 h-[calc(100vh-250px)] flex flex-col shadow-[-20px_0_40px_rgba(0,0,0,0.05)] transform transition-transform duration-300 translate-x-0 relative z-20 rounded-r-2xl">
             {/* Top ambient glow */}
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 opacity-80"></div>
 
-            <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50/80 backdrop-blur top-0 sticky z-10">
+            <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50/80 dark:bg-slate-700/80 backdrop-blur top-0 sticky z-10">
                 <div>
-                    <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600 tracking-wide flex items-center">
-                        <HeartPulse className="w-5 h-5 text-teal-500 mr-2" />
+                    <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-teal-400 dark:to-cyan-400 tracking-wide flex items-center">
+                        <HeartPulse className="w-5 h-5 text-teal-500 dark:text-teal-400 mr-2" />
                         AI Analysis Report
                     </h2>
-                    <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-widest ml-7">Ref: {claim.claim_id}</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-1 uppercase tracking-widest ml-7">Ref: {claim.claim_id}</p>
                 </div>
                 <button
                     onClick={onClose}
-                    className="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors border border-transparent hover:border-slate-300"
+                    className="p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors border border-transparent hover:border-slate-300 dark:hover:border-slate-600"
                 >
                     <X size={20} />
                 </button>

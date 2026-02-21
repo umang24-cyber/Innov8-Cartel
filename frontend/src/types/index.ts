@@ -1,12 +1,13 @@
 export type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
 
 export interface Claim {
-  claim_id: string; // From backend
+  claim_id: string;
   Provider_ID: string;
   Diagnosis_Code: string;
   Procedure_Code: string;
   Total_Claim_Amount: number;
   Unstructured_Notes: string;
+  createdAt?: string;
 
   // Enriched fields from ML Backend
   riskScore?: number;
@@ -21,9 +22,50 @@ export interface Claim {
   status?: 'Pending' | 'Investigating' | 'Cleared' | 'Rejected';
   
   // New features: Anomaly Detection & Benford's Law
-  anomalyScore?: number; // -1 = anomaly, 1 = normal
-  benfordScore?: number; // 0-100, higher = more suspicious
-  benfordAnalysis?: string; // Human-readable explanation
+  anomalyScore?: number;
+  benfordScore?: number;
+  benfordAnalysis?: string;
+}
+
+export interface Case {
+  id: string;
+  claim_id: string;
+  claim?: Claim;
+  status: 'Open' | 'Investigating' | 'Escalated' | 'Closed';
+  assignedTo?: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  notes: CaseNote[];
+  timeline: TimelineEvent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CaseNote {
+  id: string;
+  author: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface TimelineEvent {
+  id: string;
+  type: 'status_change' | 'assignment' | 'note' | 'evidence';
+  actor: string;
+  description: string;
+  timestamp: string;
+}
+
+export interface Typology {
+  id: string;
+  name: string;
+  description: string;
+  riskWeight: number;
+  frequency: number;
+  lastTriggered?: string;
+  isActive: boolean;
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+  rules: string[];
+  createdAt: string;
 }
 
 export interface Metric {
@@ -40,6 +82,31 @@ export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   timestamp: string;
+  isLoading?: boolean;
+}
+
+export interface DashboardStats {
+  totalClaims: number;
+  totalClaimsTrend: number;
+  highRiskAlerts: number;
+  highRiskTrend: number;
+  falsePositiveRate: number;
+  falsePositiveTrend: number;
+  pendingInvestigations: number;
+  pendingTrend: number;
+  monthlyFraudGrowth: number;
+}
+
+export interface FraudTrend {
+  date: string;
+  fraudCount: number;
+  totalClaims: number;
+}
+
+export interface RiskDistribution {
+  level: RiskLevel;
+  count: number;
+  percentage: number;
 }
 
 export type ViewState = 'overview' | 'queue' | 'case_manager' | 'typology' | 'settings';

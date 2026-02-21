@@ -1,6 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Claim } from '../types';
-import { ChevronDown, Filter, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Filter, Loader2, CheckSquare, Square, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { EmptyState } from './ui/EmptyState';
+import { Skeleton } from './ui/Skeleton';
+import { formatCurrency } from '../utils/format';
 
 interface AlertQueueProps {
     claims: Claim[];
@@ -9,11 +14,21 @@ interface AlertQueueProps {
     isLoadingId?: string | null;
 }
 
-const AlertQueue: React.FC<AlertQueueProps> = ({ claims, selectedClaimId, onSelectClaim, isLoadingId }) => {
-    const [sortField, setSortField] = useState<keyof Claim>('riskScore');
-    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+type SortField = 'claim_id' | 'Provider_ID' | 'Total_Claim_Amount' | 'riskScore' | 'createdAt';
+type SortDirection = 'asc' | 'desc';
 
-    const handleSort = (field: keyof Claim) => {
+const ITEMS_PER_PAGE = 10;
+
+export const AlertQueue: React.FC<AlertQueueProps> = ({ claims, selectedClaimId, onSelectClaim, isLoadingId }) => {
+    const [sortField, setSortField] = useState<SortField>('riskScore');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+    const [selectedRiskLevels, setSelectedRiskLevels] = useState<Set<string>>(new Set(['Low', 'Medium', 'High', 'Critical']));
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [selectedClaims, setSelectedClaims] = useState<Set<string>>(new Set());
+    const [showFilters, setShowFilters] = useState(false);
+
+    const handleSort = (field: SortField) => {
         if (field === sortField) {
             setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
         } else {
@@ -22,145 +37,332 @@ const AlertQueue: React.FC<AlertQueueProps> = ({ claims, selectedClaimId, onSele
         }
     };
 
-    const sortedClaims = [...claims].sort((a, b) => {
-        const valA = a[sortField] ?? 0;
-        const valB = b[sortField] ?? 0;
-        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-    });
+    const filteredAndSortedClaims = useMemo(() => {
+        let filtered = [...claims];
+
+        // Search filter
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            filtered = filtered.filter(
+                (c) =>
+                    c.claim_id.toLowerCase().includes(query) ||
+                    c.Provider_ID.toLowerCase().includes(query) ||
+                    c.Diagnosis_Code.toLowerCase().includes(query)
+            );
+        }
+
+        // Risk level filter
+        filtered = filtered.filter((c) => {
+            const level = c.riskLevel || 'Low';
+            return selectedRiskLevels.has(level);
+        });
+
+        // Sort
+        filtered.sort((a, b) => {
+            let aVal: any = a[sortField];
+            let bVal: any = b[sortField];
+
+            if (sortField === 'riskScore') {
+                aVal = a.riskScore ?? 0;
+                bVal = b.riskScore ?? 0;
+            }
+
+            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    }, [claims, searchQuery, selectedRiskLevels, sortField, sortDirection]);
+
+    const totalPages = Math.ceil(filteredAndSortedClaims.length / ITEMS_PER_PAGE);
+    const paginatedClaims = filteredAndSortedClaims.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+    );
 
     const getRiskColor = (level?: string) => {
         switch (level) {
-            case 'Critical': return 'bg-rose-100 text-rose-700 border-rose-200 shadow-sm';
-            case 'High': return 'bg-orange-100 text-orange-700 border-orange-200 shadow-sm';
-            case 'Medium': return 'bg-amber-100 text-amber-700 border-amber-200 shadow-sm';
-            case 'Low': return 'bg-teal-50 text-teal-700 border-teal-200 shadow-sm';
-            default: return 'bg-slate-100 text-slate-700 border-slate-200 shadow-sm';
-        }
-    };
-
-    const getRiskDot = (level?: string) => {
-        switch (level) {
-            case 'Critical': return 'bg-rose-500 shadow-[0_0_8px_#f43f5e]';
-            case 'High': return 'bg-orange-500';
-            case 'Medium': return 'bg-amber-500';
-            case 'Low': return 'bg-teal-500 shadow-[0_0_8px_#14b8a6]';
-            default: return 'bg-slate-400';
+            case 'Critical': return 'danger';
+            case 'High': return 'warning';
+            case 'Medium': return 'info';
+            case 'Low': return 'success';
+            default: return 'default';
         }
     };
 
     const getStatusColor = (status?: string) => {
         switch (status) {
-            case 'Pending': return 'text-amber-600 bg-amber-50';
-            case 'Investigating': return 'text-blue-600 bg-blue-50';
-            case 'Cleared': return 'text-teal-600 bg-teal-50';
-            default: return 'text-slate-600 bg-slate-50';
+            case 'Pending': return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'Investigating': return 'bg-blue-50 text-blue-700 border-blue-200';
+            case 'Cleared': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+            case 'Rejected': return 'bg-rose-50 text-rose-700 border-rose-200';
+            default: return 'bg-slate-50 text-slate-700 border-slate-200';
         }
     };
 
+    const toggleSelectClaim = (claimId: string) => {
+        const newSelected = new Set(selectedClaims);
+        if (newSelected.has(claimId)) {
+            newSelected.delete(claimId);
+        } else {
+            newSelected.add(claimId);
+        }
+        setSelectedClaims(newSelected);
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedClaims.size === paginatedClaims.length) {
+            setSelectedClaims(new Set());
+        } else {
+            setSelectedClaims(new Set(paginatedClaims.map((c) => c.claim_id)));
+        }
+    };
+
+    const SortIcon = ({ field }: { field: SortField }) => {
+        if (sortField !== field) return null;
+        return sortDirection === 'asc' ? (
+            <ChevronUp className="w-4 h-4 ml-1" />
+        ) : (
+            <ChevronDown className="w-4 h-4 ml-1" />
+        );
+    };
+
     return (
-        <div className="flex flex-col h-full bg-slate-50 relative">
-            <div className="bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl overflow-hidden flex flex-col h-[calc(100vh-250px)] shadow-xl shadow-teal-900/5 relative">
-                {/* Header / ActionBar */}
-                <div className="p-5 flex justify-between items-center border-b border-slate-200 bg-slate-50/50 backdrop-blur z-10 relative">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-lg font-extrabold text-slate-800 tracking-wide flex items-center">
-                            <div className="w-2 h-2 rounded-full bg-teal-500 mr-2 shadow-[0_0_8px_#14b8a6]"></div>
+        <div className="flex flex-col h-full bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/50 backdrop-blur">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6]"></div>
                             Live Alert Queue
                         </h2>
-                        <span className="bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            {claims.length} Records
-                        </span>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            {filteredAndSortedClaims.length} of {claims.length} claims
+                        </p>
                     </div>
-                    <div className="flex gap-3">
-                        <button className="flex items-center text-sm font-semibold text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-50 hover:text-slate-800 transition-colors shadow-sm cursor-pointer hover:border-teal-300">
-                            <Filter size={16} className="mr-2 text-teal-600" /> Filter
-                        </button>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="text"
+                            placeholder="Search claims..."
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 w-64"
+                        />
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowFilters(!showFilters)}
+                        >
+                            <Filter className="w-4 h-4" />
+                            Filters
+                        </Button>
                     </div>
                 </div>
 
-                {/* Table Header */}
-                <div className="grid grid-cols-6 gap-4 p-4 border-b border-slate-200 bg-slate-100 text-xs font-bold text-slate-500 uppercase tracking-widest sticky top-0 z-10 shadow-sm shadow-slate-200/50">
-                    <div className="col-span-1 cursor-pointer hover:text-teal-600 flex items-center transition-colors" onClick={() => handleSort('claim_id')}>
-                        Claim ID <ChevronDown size={14} className="ml-1" />
-                    </div>
-                    <div className="col-span-1 cursor-pointer hover:text-teal-600 flex items-center transition-colors" onClick={() => handleSort('Provider_ID')}>
-                        Provider
-                    </div>
-                    <div className="col-span-1 cursor-pointer hover:text-teal-600 flex items-center transition-colors" onClick={() => handleSort('Diagnosis_Code')}>
-                        Diagnosis
-                    </div>
-                    <div className="col-span-1 cursor-pointer hover:text-teal-600 flex items-center transition-colors justify-end" onClick={() => handleSort('Total_Claim_Amount')}>
-                        Amount <ChevronDown size={14} className="ml-1" />
-                    </div>
-                    <div className="col-span-1 cursor-pointer hover:text-teal-600 flex items-center justify-center transition-colors" onClick={() => handleSort('riskScore')}>
-                        Risk Score <ChevronDown size={14} className="ml-1" />
-                    </div>
-                    <div className="col-span-1 text-right">Status</div>
-                </div>
-
-                {/* Table Body */}
-                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-teal-200/50 scrollbar-track-transparent bg-white/50">
-                    <div className="flex flex-col">
-                        {sortedClaims.map((claim) => (
-                            <div
-                                key={claim.claim_id}
-                                onClick={() => onSelectClaim(claim.claim_id)}
-                                className={`grid grid-cols-6 gap-4 p-4 border-b border-slate-100 items-center transition-all duration-200 hover:bg-teal-50/50 cursor-pointer relative group ${selectedClaimId === claim.claim_id ? 'bg-teal-50' : ''
+                {/* Filter Drawer */}
+                {showFilters && (
+                    <div className="mt-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Risk Levels</p>
+                        <div className="flex flex-wrap gap-2">
+                            {['Low', 'Medium', 'High', 'Critical'].map((level) => (
+                                <button
+                                    key={level}
+                                    onClick={() => {
+                                        const newSet = new Set(selectedRiskLevels);
+                                        if (newSet.has(level)) {
+                                            newSet.delete(level);
+                                        } else {
+                                            newSet.add(level);
+                                        }
+                                        setSelectedRiskLevels(newSet);
+                                        setCurrentPage(1);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                        selectedRiskLevels.has(level)
+                                            ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700'
+                                            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600'
                                     }`}
-                            >
-                                {/* Active Row Indicator */}
-                                {selectedClaimId === claim.claim_id && (
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-teal-500 shadow-[0_0_10px_#14b8a6]"></div>
-                                )}
+                                >
+                                    {level}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
 
-                                <div className="col-span-1 font-mono text-sm font-semibold text-slate-700 tracking-tight flex items-center">
-                                    {claim.claim_id}
-                                    {isLoadingId === claim.claim_id && (
-                                        <Loader2 className="ml-2 w-3 h-3 text-teal-500 animate-spin" />
-                                    )}
-                                </div>
-                                <div className="col-span-1 text-sm text-slate-600 font-medium truncate" title={claim.Provider_ID}>
-                                    {claim.Provider_ID}
-                                </div>
-                                <div className="col-span-1">
-                                    <span className="bg-slate-100 border border-slate-200 text-slate-700 px-2 py-0.5 rounded text-xs font-mono font-medium shadow-sm">
-                                        {claim.Diagnosis_Code}
-                                    </span>
-                                </div>
-                                <div className="col-span-1 text-sm font-bold text-slate-800 text-right">
-                                    ${claim.Total_Claim_Amount.toLocaleString()}
-                                </div>
-                                <div className="col-span-1 flex justify-center">
-                                    {claim.riskScore !== undefined ? (
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold border flex items-center justify-center w-24 tracking-wide ${getRiskColor(claim.riskLevel)}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-2 ${getRiskDot(claim.riskLevel)}`}></span>
-                                            {claim.riskScore}/100
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-400 text-xs italic bg-slate-50 px-2 py-1 border border-slate-200 rounded-full font-medium">Unscored</span>
-                                    )}
-                                </div>
-                                <div className="col-span-1 text-right">
-                                    <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md ${getStatusColor(claim.status)}`}>
-                                        {claim.status || 'Pending'}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                        {claims.length === 0 && (
-                            <div className="p-8 text-center text-slate-500 font-medium flex flex-col items-center justify-center h-full">
-                                <Loader2 className="w-8 h-8 text-teal-500 mb-4 animate-spin" />
-                                <p>Loading records from ML Pipeline...</p>
-                            </div>
-                        )}
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto">
+                {claims.length === 0 ? (
+                    <EmptyState
+                        title="No claims found"
+                        description="Claims will appear here when they are processed"
+                    />
+                ) : (
+                    <>
+                        <table className="w-full">
+                            <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80 backdrop-blur z-10 border-b border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    <th className="px-6 py-4 text-left">
+                                        <button
+                                            onClick={toggleSelectAll}
+                                            className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                                        >
+                                            {selectedClaims.size === paginatedClaims.length ? (
+                                                <CheckSquare className="w-4 h-4 text-teal-600" />
+                                            ) : (
+                                                <Square className="w-4 h-4 text-slate-400" />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th
+                                        className="px-6 py-4 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                                        onClick={() => handleSort('claim_id')}
+                                    >
+                                        <div className="flex items-center">
+                                            Claim ID
+                                            <SortIcon field="claim_id" />
+                                        </div>
+                                    </th>
+                                    <th
+                                        className="px-6 py-4 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                                        onClick={() => handleSort('Provider_ID')}
+                                    >
+                                        <div className="flex items-center">
+                                            Provider
+                                            <SortIcon field="Provider_ID" />
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        Diagnosis
+                                    </th>
+                                    <th
+                                        className="px-6 py-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                                        onClick={() => handleSort('Total_Claim_Amount')}
+                                    >
+                                        <div className="flex items-center justify-end">
+                                            Amount
+                                            <SortIcon field="Total_Claim_Amount" />
+                                        </div>
+                                    </th>
+                                    <th
+                                        className="px-6 py-4 text-center text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                                        onClick={() => handleSort('riskScore')}
+                                    >
+                                        <div className="flex items-center justify-center">
+                                            Risk Score
+                                            <SortIcon field="riskScore" />
+                                        </div>
+                                    </th>
+                                    <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                        Status
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                {paginatedClaims.map((claim) => (
+                                    <tr
+                                        key={claim.claim_id}
+                                        onClick={() => onSelectClaim(claim.claim_id)}
+                                        className={`cursor-pointer transition-all hover:bg-teal-50/50 dark:hover:bg-teal-900/10 ${
+                                            selectedClaimId === claim.claim_id
+                                                ? 'bg-teal-50 dark:bg-teal-900/20'
+                                                : ''
+                                        }`}
+                                    >
+                                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => toggleSelectClaim(claim.claim_id)}
+                                                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                                            >
+                                                {selectedClaims.has(claim.claim_id) ? (
+                                                    <CheckSquare className="w-4 h-4 text-teal-600" />
+                                                ) : (
+                                                    <Square className="w-4 h-4 text-slate-400" />
+                                                )}
+                                            </button>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                    {claim.claim_id}
+                                                </span>
+                                                {isLoadingId === claim.claim_id && (
+                                                    <Loader2 className="w-3 h-3 text-teal-500 animate-spin" />
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400 font-medium">
+                                            {claim.Provider_ID}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Badge size="sm" variant="default">
+                                                {claim.Diagnosis_Code}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                                                {formatCurrency(claim.Total_Claim_Amount)}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {claim.riskScore !== undefined ? (
+                                                <Badge variant={getRiskColor(claim.riskLevel)} size="sm">
+                                                    {claim.riskScore}/100
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">Unscored</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <Badge size="sm" className={getStatusColor(claim.status)}>
+                                                {claim.status || 'Pending'}
+                                            </Badge>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </>
+                )}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-700/50">
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                        {Math.min(currentPage * ITEMS_PER_PAGE, filteredAndSortedClaims.length)} of{' '}
+                        {filteredAndSortedClaims.length} claims
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </Button>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300 px-3">
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </Button>
                     </div>
                 </div>
-
-                {/* Bottom Gradient Fade */}
-                <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
-            </div>
+            )}
         </div>
     );
 };

@@ -803,6 +803,7 @@ async def demo_claims(
 
 
 from fastapi.responses import JSONResponse
+from datetime import datetime, timedelta
 
 @app.post("/generate_report")
 async def generate_report():
@@ -822,6 +823,227 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 app.mount("/assets", StaticFiles(directory="../frontend/dist/assets"), name="assets")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# New Endpoints for Enhanced Features
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/claims")
+async def get_claims():
+    """Get all claims (same as demo_claims for now)"""
+    return await demo_claims()
+
+@app.get("/claims/{claim_id}")
+async def get_claim(claim_id: str):
+    """Get a single claim by ID"""
+    claims = await demo_claims()
+    claim = next((c for c in claims if c.get("claim_id") == claim_id), None)
+    if not claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
+    return claim
+
+@app.get("/fraud_trends")
+async def get_fraud_trends():
+    """Get fraud trends for the last 30 days"""
+    # Mock data - in production, query from database
+    import random
+    from datetime import datetime, timedelta
+    
+    trends = []
+    for i in range(30):
+        date = (datetime.now() - timedelta(days=29-i)).strftime("%Y-%m-%d")
+        trends.append({
+            "date": date,
+            "fraudCount": random.randint(5, 25),
+            "totalClaims": random.randint(200, 500),
+        })
+    return trends
+
+@app.get("/risk_distribution")
+async def get_risk_distribution():
+    """Get risk level distribution"""
+    # Mock data - in production, calculate from database
+    return [
+        {"level": "Low", "count": 8500, "percentage": 59.5},
+        {"level": "Medium", "count": 4200, "percentage": 29.4},
+        {"level": "High", "count": 1200, "percentage": 8.4},
+        {"level": "Critical", "count": 384, "percentage": 2.7},
+    ]
+
+# Cases endpoints
+cases_db: list[dict] = []  # Mock database
+
+@app.get("/cases")
+async def get_cases():
+    """Get all cases"""
+    if not cases_db:
+        # Initialize with some mock cases
+        demo_claims_data = await demo_claims()
+        for i, claim in enumerate(demo_claims_data[:5]):
+            cases_db.append({
+                "id": f"CASE-{1000 + i}",
+                "claim_id": claim.get("claim_id", ""),
+                "claim": claim,
+                "status": "Open" if i < 2 else "Investigating",
+                "assignedTo": "John Doe" if i % 2 == 0 else None,
+                "priority": "High" if i < 2 else "Medium",
+                "notes": [],
+                "timeline": [
+                    {
+                        "id": f"timeline-{i}-1",
+                        "type": "status_change",
+                        "actor": "System",
+                        "description": f"Case created for claim {claim.get('claim_id')}",
+                        "timestamp": (datetime.now() - timedelta(days=i)).isoformat(),
+                    }
+                ],
+                "createdAt": (datetime.now() - timedelta(days=i)).isoformat(),
+                "updatedAt": (datetime.now() - timedelta(days=i)).isoformat(),
+            })
+    return cases_db
+
+@app.get("/cases/{case_id}")
+async def get_case(case_id: str):
+    """Get a single case"""
+    case = next((c for c in cases_db if c.get("id") == case_id), None)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+@app.patch("/cases/{case_id}")
+async def update_case(case_id: str, updates: dict):
+    """Update a case"""
+    case = next((c for c in cases_db if c.get("id") == case_id), None)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    case.update(updates)
+    case["updatedAt"] = datetime.now().isoformat()
+    
+    # Add timeline event
+    if "status" in updates:
+        case["timeline"].append({
+            "id": f"timeline-{len(case['timeline'])}",
+            "type": "status_change",
+            "actor": "User",
+            "description": f"Status changed to {updates['status']}",
+            "timestamp": datetime.now().isoformat(),
+        })
+    
+    return case
+
+@app.post("/cases/{case_id}/notes")
+async def add_case_note(case_id: str, note_data: dict):
+    """Add a note to a case"""
+    case = next((c for c in cases_db if c.get("id") == case_id), None)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    
+    note = {
+        "id": f"note-{len(case['notes'])}",
+        "author": "Current User",  # In production, get from auth
+        "content": note_data.get("content", ""),
+        "createdAt": datetime.now().isoformat(),
+    }
+    case["notes"].append(note)
+    case["timeline"].append({
+        "id": f"timeline-{len(case['timeline'])}",
+        "type": "note",
+        "actor": note["author"],
+        "description": f"Added note: {note['content'][:50]}...",
+        "timestamp": datetime.now().isoformat(),
+    })
+    case["updatedAt"] = datetime.now().isoformat()
+    
+    return note
+
+# Typologies endpoints
+typologies_db: list[dict] = []  # Mock database
+
+@app.get("/typologies")
+async def get_typologies():
+    """Get all typologies"""
+    if not typologies_db:
+        # Initialize with mock data
+        typologies_db.extend([
+            {
+                "id": "typ-1",
+                "name": "Unusually High Claim Amounts",
+                "description": "Detects claims that exceed expected amounts for diagnosis codes",
+                "riskWeight": 85,
+                "frequency": 142,
+                "lastTriggered": (datetime.now() - timedelta(hours=2)).isoformat(),
+                "isActive": True,
+                "severity": "High",
+                "rules": ["Total_Claim_Amount > expected_mean * 3", "z_score > 2.5"],
+                "createdAt": (datetime.now() - timedelta(days=30)).isoformat(),
+            },
+            {
+                "id": "typ-2",
+                "name": "Benford's Law Violation",
+                "description": "Detects suspicious digit distribution patterns",
+                "riskWeight": 70,
+                "frequency": 89,
+                "lastTriggered": (datetime.now() - timedelta(hours=5)).isoformat(),
+                "isActive": True,
+                "severity": "Medium",
+                "rules": ["benford_score > 60"],
+                "createdAt": (datetime.now() - timedelta(days=25)).isoformat(),
+            },
+            {
+                "id": "typ-3",
+                "name": "Anomaly Detection Flag",
+                "description": "Isolation Forest detected statistical anomaly",
+                "riskWeight": 75,
+                "frequency": 203,
+                "lastTriggered": (datetime.now() - timedelta(minutes=30)).isoformat(),
+                "isActive": True,
+                "severity": "High",
+                "rules": ["anomaly_score == -1"],
+                "createdAt": (datetime.now() - timedelta(days=20)).isoformat(),
+            },
+        ])
+    return typologies_db
+
+@app.post("/typologies")
+async def create_typology(typology_data: dict):
+    """Create a new typology"""
+    typology = {
+        "id": f"typ-{len(typologies_db) + 1}",
+        **typology_data,
+        "frequency": 0,
+        "createdAt": datetime.now().isoformat(),
+    }
+    typologies_db.append(typology)
+    return typology
+
+@app.patch("/typologies/{typology_id}")
+async def update_typology(typology_id: str, updates: dict):
+    """Update a typology"""
+    typology = next((t for t in typologies_db if t.get("id") == typology_id), None)
+    if not typology:
+        raise HTTPException(status_code=404, detail="Typology not found")
+    typology.update(updates)
+    return typology
+
+@app.delete("/typologies/{typology_id}")
+async def delete_typology(typology_id: str):
+    """Delete a typology"""
+    global typologies_db
+    typologies_db = [t for t in typologies_db if t.get("id") != typology_id]
+    return {"message": "Typology deleted"}
+
+# AI Explain endpoint
+@app.post("/ai/explain")
+async def explain_risk(explain_request: dict):
+    """Get AI explanation for risk factors"""
+    claim_id = explain_request.get("claim_id")
+    question = explain_request.get("question", "Explain the risk factors for this claim")
+    
+    # In production, use the actual claim data and AI model
+    return {
+        "explanation": f"AI analysis for claim {claim_id}: {question}. This claim shows elevated risk due to multiple factors including amount deviation, provider history, and anomaly detection flags."
+    }
 
 @app.get("/{full_path:path}")
 async def serve_react(full_path: str):
