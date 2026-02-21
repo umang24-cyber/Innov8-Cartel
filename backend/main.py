@@ -14,7 +14,7 @@ ARCHITECTURE OVERVIEW:
            │   → Returns top feature contribution as human-readable text
            │   → Critical for the "glass-box" explainability panel in the UI
            │
-  Layer C │  LLM (llama-3.3-70b)
+  Layer C │ Groq LLM (llama-3.3-70b)
            │   → Reads the unstructured doctor's note
            │   → Acts as a medical auditor: does the note justify the bill?
            │   → Returns 1-2 sentence finding + detailed SHAP breakdown
@@ -43,7 +43,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import shap
-from openai import OpenAI
+from groq import Groq
 import math
 
 from dotenv import load_dotenv
@@ -65,7 +65,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-MEGA_LLM_API_KEY = os.getenv("MEGA_LLM_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 MODEL_PATH   = "fraud_model.joblib"
 
 # MUST match train_model.py exactly — same column names, same order
@@ -104,7 +104,7 @@ class AppState:
     pipeline:     Any       = None   # the full fitted imblearn Pipeline
     explainer:    Any       = None   # SHAP TreeExplainer around the RF
     feature_names: list[str] = []    # OHE-expanded feature names
-    llm_client:  Any       = None   # megallm  API client
+    groq_client:  Any       = None   # Groq API client
     isolation_forest: Any   = None   # Isolation Forest for anomaly detection
     historical_claims: pd.DataFrame = None  # Historical data for Benford's Law
 
@@ -154,15 +154,11 @@ async def lifespan(app_instance):
     log.info("✅  SHAP TreeExplainer ready")
 
     # ── Initialize Groq client ────────────────────────────────────────────
-    # ── Initialize Mega LLM client ────────────────────────────────────────────
-    if MEGA_LLM_API_KEY:
-        app_state.llm_client = OpenAI(
-            base_url="https://ai.megallm.io/v1",
-            api_key=MEGA_LLM_API_KEY
-        )
-        log.info("✅  Mega LLM client initialized")
+    if GROQ_API_KEY:
+        app_state.groq_client = Groq(api_key=GROQ_API_KEY)
+        log.info("✅  Groq client initialized")
     else:
-        log.warning("⚠️  MEGA_LLM_API_KEY not set — LLM analysis will be skipped")
+        log.warning("⚠️  GROQ_API_KEY not set — LLM analysis will be skipped")
 
     # ── Initialize Isolation Forest for anomaly detection ─────────────────
     # Load historical claims data to train the Isolation Forest
@@ -423,20 +419,40 @@ def build_shap_outputs(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Helper: Mega LLM clinical note analysis (GLM-4.7)
+# Helper: Groq LLM clinical note analysis
 # ══════════════════════════════════════════════════════════════════════════════
-def analyze_with_llm(claim: "ClaimRequest", risk_score: int, shap_text: str) -> str:
-    if not app_state.llm_client:
-        return "LLM analysis unavailable — MEGA_LLM_API_KEY not configured."
+def analyze_with_groq(claim: "ClaimRequest", risk_score: int, shap_text: str) -> str:
+    """
+    Sends the claim context to Groq's LLaMA model acting as a medical auditor.
 
+    WHY Groq:
+      Groq's LPU (Language Processing Unit) hardware delivers extremely low
+      latency — typically <1 second for this prompt size. Critical for a
+      real-time dashboard that needs to feel snappy.
+
+    WHY llama-3.3-70b-versatile:
+      Large enough to have genuine medical billing knowledge, but fast enough
+      for interactive use. The 70B model understands ICD-10 codes, CPT codes,
+      and can reason about clinical appropriateness.
+    """
+    if not app_state.groq_client:
+        return "LLM analysis unavailable — GROQ_API_KEY not configured."
+
+    # Retrieve diagnosis-specific stats for context
     stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
 
+    # The system prompt defines the AI's persona and constraints.
+    # Being specific ("senior medical billing auditor") produces much better
+    # output than a generic "helpful assistant" prompt.
     system_prompt = """You are a senior medical billing auditor with 15+ years of 
 experience in healthcare fraud detection. Your role is ADVISORY ONLY — you 
 flag potential issues for human investigators but never make final decisions.
 Be concise, specific, and clinically accurate. Reference actual medical billing 
 standards when relevant."""
 
+    # The user prompt provides all context the model needs.
+    # We include the ML risk score and SHAP finding so the LLM can
+    # integrate structured and unstructured signals in its response.
     user_prompt = f"""Analyze this healthcare claim for potential fraud indicators:
 
 CLAIM DETAILS:
@@ -459,28 +475,22 @@ Your task:
 Respond in exactly 3 sentences. Be specific about amounts, codes, and clinical reasoning."""
 
     try:
-        response = app_state.llm_client.chat.completions.create(
-            model="glm-4.7", # Try changing this to "glm-4" if it still returns empty
+        response = app_state.groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
             ],
-            temperature=0.1,
-            max_tokens=250,
+            temperature=0.1,      # very low → factual, consistent, reproducible
+            max_tokens=250,       # enforce brevity for the UI panel
         )
-        
-        # Safely extract the content
-        content = response.choices[0].message.content
-        
-        if content:
-            return content.strip()
-        else:
-            log.warning(f"Mega LLM returned an empty response. Raw data: {response}")
-            return "LLM analysis unavailable: Mega LLM returned a blank response. Check your terminal logs."
+        return response.choices[0].message.content.strip()
 
     except Exception as exc:
-        log.error(f"Mega LLM API error: {exc}")
+        log.error(f"Groq API error: {exc}")
         return f"LLM analysis unavailable: {str(exc)[:200]}"
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Main endpoint: POST /analyze_claim
 # ══════════════════════════════════════════════════════════════════════════════
@@ -581,10 +591,10 @@ async def analyze_claim(claim: ClaimRequest):
         log.warning(f"SHAP failed: {exc}")
         shap_explanation = f"SHAP analysis unavailable: {exc}"
 
-    # ── Layer C: mega LLM Analysis ─────────────────────────────────────────
+    # ── Layer C: Groq LLM Analysis ─────────────────────────────────────────
     # Pass both the SHAP finding and risk score so Groq can integrate
     # structured ML signals with its unstructured note analysis.
-    llm_analysis = analyze_with_llm(claim, risk_score, shap_explanation)
+    llm_analysis = analyze_with_groq(claim, risk_score, shap_explanation)
 
     # ── Layer D: Isolation Forest Anomaly Detection ────────────────────────
     anomaly_score = 1  # Default: normal
@@ -727,8 +737,8 @@ async def chat(req: ChatRequest):
     The claim_context (if provided) is injected into the system prompt
     so the AI can answer specifically about the current claim being viewed.
     """
-    if not app_state.llm_client:
-        return ChatResponse(reply="megallm API not configured. Please set GROQ_API_KEY.")
+    if not app_state.groq_client:
+        return ChatResponse(reply="Groq API not configured. Please set GROQ_API_KEY.")
 
     # Build context block if claim data is attached
     context_block = ""
@@ -753,28 +763,20 @@ Be concise, helpful, and always remind investigators that you are advisory only.
 Never recommend claim rejection — only flag items for human review."""
 
     try:
-        response = app_state.llm_client.chat.completions.create(
-            model="glm-4.7", # Try changing this to "glm-4" if it still returns empty
+        response = app_state.groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system",  "content": system},
                 {"role": "user",    "content": req.message},
             ],
-            temperature=0.7,
-            max_tokens=1500,
+            temperature=0.3,
+            max_tokens=300,
         )
-        
-        # Safely extract the content
-        content = response.choices[0].message.content
-        
-        if content:
-            return ChatResponse(reply=content.strip())
-        else:
-            log.warning(f"Mega LLM returned an empty response. Raw data: {response}")
-            return ChatResponse(reply="Error: Mega LLM returned a blank response. Check your terminal logs.")
-            
+        return ChatResponse(reply=response.choices[0].message.content.strip())
     except Exception as exc:
-        log.error(f"Chat Mega LLM error: {exc}")
+        log.error(f"Chat Groq error: {exc}")
         return ChatResponse(reply=f"Error: {str(exc)[:150]}")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Health check — used by frontend to verify backend is alive
@@ -818,18 +820,14 @@ async def get_dashboard_stats():
             monthly_fraud_growth=0,
         )
     
-    # Include dynamically added claims in the total
-    total = len(df) + len(saved_claims_db)
+    total = len(df)
+    fraud_count = int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0
+    fraud_rate = (fraud_count / total * 100) if total > 0 else 0
     
+    # Simulate high-risk alerts as claims with amount > 2 std devs above mean
     mean_amt = df["Total_Claim_Amount"].mean()
     std_amt = df["Total_Claim_Amount"].std()
-    
-    # Check if any dynamically added claims are high risk
-    high_risk_dynamic = sum(1 for claim in saved_claims_db if claim.get("Total_Claim_Amount", 0) > mean_amt + 1.5 * std_amt)
-    
-    fraud_count = (int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0) + high_risk_dynamic
-    fraud_rate = (fraud_count / total * 100) if total > 0 else 0
-    high_risk = int((df["Total_Claim_Amount"] > mean_amt + 1.5 * std_amt).sum()) + high_risk_dynamic
+    high_risk = int((df["Total_Claim_Amount"] > mean_amt + 1.5 * std_amt).sum())
     
     # Pending investigations = fraud cases not yet at extremes
     pending = max(0, fraud_count - high_risk)
@@ -857,14 +855,8 @@ async def get_fraud_trends():
     if df is None or df.empty:
         return []
     
-    total = len(df) + len(saved_claims_db)
-    
-    mean_amt = df["Total_Claim_Amount"].mean()
-    std_amt = df["Total_Claim_Amount"].std()
-    dynamic_fraud = sum(1 for c in saved_claims_db if c.get("Total_Claim_Amount", 0) > mean_amt + 1.5 * std_amt)
-    
-    fraud_count = (int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0) + dynamic_fraud
-    
+    total = len(df)
+    fraud_count = int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0
     daily_avg_claims = max(1, total // 30)
     daily_avg_fraud = max(1, fraud_count // 30)
     
@@ -892,11 +884,12 @@ async def get_risk_distribution():
     if df is None or df.empty:
         return []
     
-    total = len(df) + len(saved_claims_db)
+    total = len(df)
     if "Is_Fraud" not in df.columns:
         return []
     
     fraud_count = int(df["Is_Fraud"].sum())
+    legit_count = total - fraud_count
     
     mean_amt = df["Total_Claim_Amount"].mean()
     std_amt = df["Total_Claim_Amount"].std()
@@ -905,16 +898,6 @@ async def get_risk_distribution():
     critical = int((df["Total_Claim_Amount"] > mean_amt + 2 * std_amt).sum())
     high = int(((df["Total_Claim_Amount"] > mean_amt + std_amt) & (df["Total_Claim_Amount"] <= mean_amt + 2 * std_amt)).sum())
     medium = int(((df["Total_Claim_Amount"] > mean_amt) & (df["Total_Claim_Amount"] <= mean_amt + std_amt)).sum())
-    
-    for claim in saved_claims_db:
-        amt = claim.get("Total_Claim_Amount", 0)
-        if amt > mean_amt + 2 * std_amt:
-            critical += 1
-        elif amt > mean_amt + std_amt:
-            high += 1
-        elif amt > mean_amt:
-            medium += 1
-            
     low = total - critical - high - medium
     
     result = [
@@ -1061,6 +1044,33 @@ async def get_claim(claim_id: str):
         raise HTTPException(status_code=404, detail="Claim not found")
     return claim
 
+@app.get("/fraud_trends")
+async def get_fraud_trends():
+    """Get fraud trends for the last 30 days"""
+    # Mock data - in production, query from database
+    import random
+    from datetime import datetime, timedelta
+    
+    trends = []
+    for i in range(30):
+        date = (datetime.now() - timedelta(days=29-i)).strftime("%Y-%m-%d")
+        trends.append({
+            "date": date,
+            "fraudCount": random.randint(5, 25),
+            "totalClaims": random.randint(200, 500),
+        })
+    return trends
+
+@app.get("/risk_distribution")
+async def get_risk_distribution():
+    """Get risk level distribution"""
+    # Mock data - in production, calculate from database
+    return [
+        {"level": "Low", "count": 8500, "percentage": 59.5},
+        {"level": "Medium", "count": 4200, "percentage": 29.4},
+        {"level": "High", "count": 1200, "percentage": 8.4},
+        {"level": "Critical", "count": 384, "percentage": 2.7},
+    ]
 
 # Cases endpoints
 cases_db: list[dict] = []  # Mock database
