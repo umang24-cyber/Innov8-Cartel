@@ -34,10 +34,11 @@ API Docs (auto-generated):
 """
 
 import os
+import io # <-- NEW IMPORT
 import logging
 from contextlib import asynccontextmanager
-from typing import Any
-from typing import Optional
+from typing import Any, Optional
+
 import joblib
 import numpy as np
 import pandas as pd
@@ -46,8 +47,9 @@ from groq import Groq
 import math
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile # <-- UPDATED
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse # <-- UPDATED
 from pydantic import BaseModel, Field
 from sklearn.ensemble import IsolationForest
 
@@ -651,6 +653,65 @@ async def analyze_claim(claim: ClaimRequest):
         benford_analysis = benford_analysis,
     )
 
+@app.post("/analyze_batch")
+async def analyze_batch(file: UploadFile = File(...)):
+    """
+    Enterprise Batch Processing Endpoint.
+    Accepts a CSV of claims, processes them through the Random Forest 
+    and Isolation Forest, and returns an annotated CSV with Risk Scores.
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only .csv files are supported")
+
+    try:
+        # 1. Read the uploaded CSV into memory as a Pandas DataFrame
+        contents = await file.read()
+        df = pd.read_csv(io.BytesIO(contents))
+        
+        # 2. Validate that the required columns exist
+        missing_cols = [col for col in ALL_FEATURES if col not in df.columns]
+        if missing_cols:
+            raise HTTPException(status_code=400, detail=f"CSV missing required columns: {missing_cols}")
+
+        # 3. Transform the data using your ML pipeline's preprocessor
+        preprocessor = app_state.pipeline.named_steps["preprocessor"]
+        X_transformed = preprocessor.transform(df)
+
+        # 4. Generate Risk Scores using the Random Forest
+        rf_model = app_state.pipeline.named_steps["classifier"]
+        probs = rf_model.predict_proba(X_transformed)[:, 1] # Get fraud probabilities
+        df["Risk_Score"] = (probs * 100).astype(int)
+        
+        # 5. Assign Risk Labels (LOW, MEDIUM, HIGH)
+        df["Risk_Label"] = pd.cut(
+            df["Risk_Score"], 
+            bins=[-1, 29, 59, 100], 
+            labels=["LOW", "MEDIUM", "HIGH"]
+        )
+
+        # 6. Run Isolation Forest Anomaly Detection
+        if app_state.isolation_forest is not None:
+            anomalies = app_state.isolation_forest.predict(X_transformed)
+            # Map -1 to "ANOMALY", 1 to "NORMAL"
+            df["Anomaly_Flag"] = ["ANOMALY" if x == -1 else "NORMAL" for x in anomalies]
+
+        # 7. Convert the annotated DataFrame back to a CSV in memory
+        stream = io.StringIO()
+        df.to_csv(stream, index=False)
+        stream.seek(0) # Reset stream position to the beginning
+
+        # 8. Return as a downloadable file
+        return StreamingResponse(
+            iter([stream.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=scored_{file.filename}"
+            }
+        )
+
+    except Exception as exc:
+        log.error(f"Batch processing failed: {exc}")
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(exc)}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Chatbot endpoint: POST /chat  (for the Agentic AI Investigator UI widget)
@@ -805,19 +866,42 @@ async def demo_claims(
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
 
-@app.post("/generate_report")
+@app.get("/generate_report")
 async def generate_report():
     """
     Triggered by the 'Generate Report' button in the UI.
-    Currently returns a success message. 
+    Creates an on-the-fly CSV of current high-risk alerts and pending investigations.
     """
-    # TODO: Add PDF or CSV generation logic here
-    return JSONResponse(
-        content={
-            "status": "success", 
-            "message": "Report generation initiated. The file will download shortly."
-        }
-    )
+    try:
+        # Fetch the current claims (in production, this queries your SQL database)
+        claims = await demo_claims()
+        
+        # Convert to a Pandas DataFrame for easy manipulation
+        df = pd.DataFrame(claims)
+        
+        # Create an in-memory string buffer
+        stream = io.StringIO()
+        
+        # Write the DataFrame to the buffer as a CSV
+        df.to_csv(stream, index=False)
+        
+        # Reset the buffer's position so it can be read from the start
+        stream.seek(0)
+        
+        # Generate a timestamped filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        filename = f"FinCense_Audit_Report_{timestamp}.csv"
+        
+        return StreamingResponse(
+            iter([stream.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except Exception as exc:
+        log.error(f"Report generation failed: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to generate report")
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
