@@ -14,7 +14,7 @@ ARCHITECTURE OVERVIEW:
            │   → Returns top feature contribution as human-readable text
            │   → Critical for the "glass-box" explainability panel in the UI
            │
-  Layer C │ Groq LLM (llama-3.3-70b)
+  Layer C │  LLM (llama-3.3-70b)
            │   → Reads the unstructured doctor's note
            │   → Acts as a medical auditor: does the note justify the bill?
            │   → Returns 1-2 sentence finding + detailed SHAP breakdown
