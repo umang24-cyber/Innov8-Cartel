@@ -35,7 +35,7 @@ import numpy as np
 import pandas as pd
 
 from imblearn.over_sampling import SMOTE
-from imblearn.pipeline import Pipeline as ImbPipeline  # MUST use imblearn, not sklearn
+from imblearn.pipeline import Pipeline as ImbPipeline 
 
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
@@ -44,18 +44,17 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-CSV_PATH   = "synthetic_claims.csv"
-MODEL_PATH = "fraud_model.joblib"
+CSV_PATH   = "synthetic_claims.csv"  # Kept original name
+MODEL_PATH = "fraud_model.joblib"    # Kept original name
 SEED       = 42
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. Load data
 # ══════════════════════════════════════════════════════════════════════════════
-print("📂  Loading data …")
+print(f"📂  Loading data from {CSV_PATH}...")
 df = pd.read_csv(CSV_PATH)
 print(f"    Shape: {df.shape}  |  Fraud rate: {df['Is_Fraud'].mean()*100:.1f}%")
 
-# Define which columns are which type
 CATEGORICAL_FEATURES = ["Provider_ID", "Diagnosis_Code", "Procedure_Code"]
 NUMERIC_FEATURES     = ["Total_Claim_Amount"]
 ALL_FEATURES         = CATEGORICAL_FEATURES + NUMERIC_FEATURES
@@ -66,24 +65,16 @@ y = df["Is_Fraud"]
 # ══════════════════════════════════════════════════════════════════════════════
 # 2. Train/test split
 # ══════════════════════════════════════════════════════════════════════════════
-# stratify=y ensures BOTH splits maintain the ~5% fraud ratio.
-# Without this, you could get a test set with 0% fraud by bad luck.
 X_train, X_test, y_train, y_test = train_test_split(
     X, y,
     test_size=0.20,
     random_state=SEED,
     stratify=y,
 )
-print(f"    Train: {len(X_train)} rows  |  Test: {len(X_test)} rows")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3. Preprocessing — ColumnTransformer
+# 3. Preprocessing
 # ══════════════════════════════════════════════════════════════════════════════
-# ColumnTransformer applies DIFFERENT transformations to DIFFERENT columns:
-#   - "cat" transformer: OneHotEncode the 3 string columns
-#     handle_unknown='ignore' → if inference sees a new Provider_ID not in training,
-#     it produces all zeros instead of crashing
-#   - "num" transformer: "passthrough" → just keep Total_Claim_Amount as-is
 categorical_transformer = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
 
 preprocessor = ColumnTransformer(
@@ -95,52 +86,45 @@ preprocessor = ColumnTransformer(
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 4. Full Pipeline (imblearn version required for SMOTE compatibility)
+# 4. Pipeline with SMOTE
 # ══════════════════════════════════════════════════════════════════════════════
-# WHY imblearn Pipeline instead of sklearn Pipeline?
-#   sklearn's Pipeline doesn't know about samplers. If you use sklearn's Pipeline,
-#   SMOTE would also run during predict(), corrupting inference.
-#   imblearn's Pipeline automatically skips sampling steps during predict().
+# SMOTE helps balance the dataset so the model doesn't ignore the 5% fraud cases.
+
 pipeline = ImbPipeline(steps=[
-    ("preprocessor", preprocessor),          # Step 1: encode strings → numbers
-    ("smote", SMOTE(                         # Step 2: balance classes (train only)
-        sampling_strategy="auto",            # upsample minority to match majority
+    ("preprocessor", preprocessor),
+    ("smote", SMOTE(
+        sampling_strategy="auto",
         random_state=SEED,
-        k_neighbors=5,                       # use 5 nearest neighbors to create synth samples
+        k_neighbors=5,
     )),
     ("classifier", RandomForestClassifier(
-        n_estimators=300,                    # 300 decision trees voted together
-        max_depth=None,                      # trees grow until leaves are pure
-        min_samples_leaf=2,                  # each leaf needs ≥2 samples (prevents overfitting)
-        class_weight="balanced",             # extra weight on fraud class as safety net
+        n_estimators=300,
+        min_samples_leaf=2,
+        class_weight="balanced",
         random_state=SEED,
-        n_jobs=-1,                           # use ALL CPU cores in parallel
+        n_jobs=-1,
     )),
 ])
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 5. Train
+# 5. Train & Evaluate
 # ══════════════════════════════════════════════════════════════════════════════
-print("\n🏋️  Training (SMOTE + RandomForest) … this takes ~30 seconds")
+print("\n🏋️  Training Pipeline (Random Forest + SMOTE)...")
 pipeline.fit(X_train, y_train)
-print("    Done.")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 6. Evaluate
-# ══════════════════════════════════════════════════════════════════════════════
 y_pred = pipeline.predict(X_test)
-y_prob = pipeline.predict_proba(X_test)[:, 1]  # probability of class=1 (fraud)
+y_prob = pipeline.predict_proba(X_test)[:, 1]
 
 print("\n📊  Classification Report:")
 print(classification_report(y_test, y_pred, target_names=["Legit", "Fraud"]))
 print(f"    ROC-AUC: {roc_auc_score(y_test, y_prob):.4f}")
-# ROC-AUC of 0.95+ means the model ranks fraud above legit 95%+ of the time
-# Much more meaningful than accuracy for imbalanced datasets
 
-# Feature importances — which inputs matter most to the forest?
-rf        = pipeline.named_steps["classifier"]
-ohe       = pipeline.named_steps["preprocessor"].named_transformers_["cat"]
-ohe_names = ohe.get_feature_names_out(CATEGORICAL_FEATURES).tolist()
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. Feature Importance
+# ══════════════════════════════════════════════════════════════════════════════
+rf         = pipeline.named_steps["classifier"]
+ohe        = pipeline.named_steps["preprocessor"].named_transformers_["cat"]
+ohe_names  = ohe.get_feature_names_out(CATEGORICAL_FEATURES).tolist()
 feat_names = ohe_names + NUMERIC_FEATURES
 
 importances = pd.Series(rf.feature_importances_, index=feat_names)
@@ -148,9 +132,7 @@ print("\n🔍  Top-10 Feature Importances:")
 print(importances.nlargest(10).to_string())
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 7. Save the pipeline
+# 7. Save
 # ══════════════════════════════════════════════════════════════════════════════
-# joblib serializes the entire fitted pipeline object to disk.
-# When loaded, it's ready to call .predict_proba() immediately — no re-training.
 joblib.dump(pipeline, MODEL_PATH)
 print(f"\n💾  Saved → {MODEL_PATH}")
