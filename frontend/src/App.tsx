@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import AlertQueue from './components/AlertQueue';
 import ExplainabilityPanel from './components/ExplainabilityPanel';
@@ -7,9 +7,10 @@ import DisclaimerModal from './components/DisclaimerModal';
 import { Overview } from './pages/Overview';
 import { TypologyStudio } from './pages/TypologyStudio';
 import { CaseManager } from './pages/CaseManager';
+import { NewClaimPage } from './pages/NewClaimPage';
 import type { Claim, ViewState } from './types';
 import { api } from './services/api';
-import { Loader2, Activity, RefreshCw, Moon, Sun } from 'lucide-react';
+import { Loader2, Activity, RefreshCw, Moon, Sun, Bell } from 'lucide-react';
 import { useTheme } from './hooks/useTheme';
 import { toast } from './utils/toast';
 
@@ -23,16 +24,17 @@ function App() {
     const [isLoadingInit, setIsLoadingInit] = useState(true);
     const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const notifRef = useRef<HTMLDivElement>(null);
 
     // Smooth tab transition handler
     const handleViewChange = (view: ViewState) => {
         if (view === currentView) return;
         setIsTransitioning(true);
         setPrevView(currentView);
-        // Short delay — fade out, switch, fade in
         setTimeout(() => {
             setCurrentView(view);
-            setSelectedClaimId(null); // reset selection on tab switch
+            setSelectedClaimId(null);
             setTimeout(() => setIsTransitioning(false), 50);
         }, 200);
     };
@@ -61,6 +63,17 @@ function App() {
         fetchClaims();
     }, []);
 
+    // Close notification dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+                setShowNotifications(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     // FIXED: Only opens the detail panel — does NOT auto-trigger /analyze_claim
     const handleSelectClaim = (id: string) => {
         if (selectedClaimId === id) {
@@ -70,7 +83,7 @@ function App() {
         setSelectedClaimId(id);
     };
 
-    // Called explicitly by the "Investigate" button in the ExplainabilityPanel
+    // Called explicitly by the "Investigate" button
     const handleInvestigateClaim = async (id: string) => {
         const claim = claims.find(c => c.claim_id === id);
         if (!claim || analyzingClaimId) return;
@@ -129,6 +142,11 @@ function App() {
 
     const selectedClaim = claims.find(c => c.claim_id === selectedClaimId) || null;
 
+    // Compute notification stats from claims
+    const highRiskClaims = claims.filter(c => c.riskScore !== undefined && c.riskScore > 60);
+    const investigatingClaims = claims.filter(c => c.status === 'Investigating');
+    const totalFlagged = claims.filter(c => c.riskScore !== undefined && c.riskScore > 40).length;
+
     return (
         <div className="flex bg-slate-50 dark:bg-slate-900 min-h-screen text-slate-900 dark:text-slate-100 font-sans selection:bg-teal-500/30 selection:text-teal-900 overflow-hidden relative transition-colors duration-200">
 
@@ -152,6 +170,7 @@ function App() {
                                 {currentView === 'case_manager' && 'Case Manager'}
                                 {currentView === 'typology' && 'Typology Studio'}
                                 {currentView === 'settings' && 'System Settings'}
+                                {currentView === 'new_claim' && 'New Claim Analysis'}
                             </h1>
                             <p className="text-slate-500 dark:text-slate-400 text-sm mt-1.5 font-semibold tracking-wide flex items-center">
                                 <Activity size={14} className="mr-1.5 text-teal-500" />
@@ -159,6 +178,70 @@ function App() {
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
+                            {/* Notification Bell */}
+                            <div className="relative" ref={notifRef}>
+                                <button
+                                    onClick={() => setShowNotifications(!showNotifications)}
+                                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 relative"
+                                    aria-label="Notifications"
+                                >
+                                    <Bell className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                                    {totalFlagged > 0 && (
+                                        <span className="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-sm min-w-[18px] min-h-[18px] animate-pulse">
+                                            {totalFlagged}
+                                        </span>
+                                    )}
+                                </button>
+
+                                {/* Notification Dropdown */}
+                                {showNotifications && (
+                                    <div className="absolute right-0 top-12 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                                            <h3 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">Risk Notifications</h3>
+                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mt-1">Alert Queue Summary</p>
+                                        </div>
+                                        <div className="p-3 space-y-2 max-h-64 overflow-y-auto">
+                                            <div className="flex items-center justify-between p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></div>
+                                                    <span className="text-sm font-bold text-rose-700 dark:text-rose-300">High Risk Claims</span>
+                                                </div>
+                                                <span className="text-lg font-black text-rose-600 dark:text-rose-400">{highRiskClaims.length}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                                                    <span className="text-sm font-bold text-amber-700 dark:text-amber-300">Under Investigation</span>
+                                                </div>
+                                                <span className="text-lg font-black text-amber-600 dark:text-amber-400">{investigatingClaims.length}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                                                    <span className="text-sm font-bold text-teal-700 dark:text-teal-300">Total Flagged</span>
+                                                </div>
+                                                <span className="text-lg font-black text-teal-600 dark:text-teal-400">{totalFlagged}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                                                    <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Total Claims Loaded</span>
+                                                </div>
+                                                <span className="text-lg font-black text-slate-700 dark:text-slate-200">{claims.length}</span>
+                                            </div>
+                                        </div>
+                                        <div className="p-3 border-t border-slate-200 dark:border-slate-700">
+                                            <button
+                                                onClick={() => { setShowNotifications(false); handleViewChange('queue'); }}
+                                                className="w-full text-center text-xs font-bold text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 py-1.5 hover:bg-teal-50 dark:hover:bg-teal-900/20 rounded-lg transition-all"
+                                            >
+                                                View Alert Queue →
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <button
                                 onClick={toggleTheme}
                                 className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95"
@@ -235,6 +318,7 @@ function App() {
 
                     {currentView === 'case_manager' && <CaseManager />}
                     {currentView === 'typology' && <TypologyStudio />}
+                    {currentView === 'new_claim' && <NewClaimPage />}
 
                     {currentView === 'settings' && (
                         <div className="flex-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm flex flex-col items-center justify-center text-slate-400">

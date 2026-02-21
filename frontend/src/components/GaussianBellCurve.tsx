@@ -105,7 +105,7 @@ const GaussianBellCurve: React.FC<GaussianBellCurveProps> = ({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 overflow-hidden">
             {/* Controls */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
@@ -151,7 +151,7 @@ const GaussianBellCurve: React.FC<GaussianBellCurveProps> = ({
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 text-center shadow-sm hover:shadow-md transition-all">
                     <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-1">Expected Mean (μ)</p>
                     <p className="text-xl font-extrabold text-slate-800 dark:text-slate-100">${mean.toLocaleString()}</p>
@@ -174,13 +174,13 @@ const GaussianBellCurve: React.FC<GaussianBellCurveProps> = ({
 
             {/* Bell Curve Chart */}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+                    <h3 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest truncate">
                         Normal Distribution — {selectedDiag}
                     </h3>
-                    <div className="flex items-center gap-4 text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                        <span className="flex items-center gap-1"><span className="w-3 h-1.5 rounded bg-teal-500"></span> Normal Zone</span>
-                        <span className="flex items-center gap-1"><span className="w-3 h-1.5 rounded bg-rose-500"></span> Fraud Zone (&gt;{sigma}σ)</span>
+                    <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500 dark:text-slate-400 flex-shrink-0 flex-wrap">
+                        <span className="flex items-center gap-1"><span className="w-3 h-1.5 rounded bg-teal-500"></span> Normal</span>
+                        <span className="flex items-center gap-1"><span className="w-3 h-1.5 rounded bg-rose-500"></span> Fraud (&gt;{sigma}σ)</span>
                         <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-orange-500"></span> Claim</span>
                     </div>
                 </div>
@@ -257,10 +257,10 @@ const GaussianBellCurve: React.FC<GaussianBellCurveProps> = ({
             </div>
 
             {/* Mathematical Explanation */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-5 text-sm">
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl p-5 text-sm overflow-hidden">
                 <div className="flex items-start gap-3">
                     <Info className="w-5 h-5 text-teal-600 dark:text-teal-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-slate-600 dark:text-slate-400 leading-relaxed space-y-2">
+                    <div className="text-slate-600 dark:text-slate-400 leading-relaxed space-y-2 min-w-0 break-words">
                         <p className="font-bold text-slate-700 dark:text-slate-200">How Gaussian Distribution Detects Fraud</p>
                         <p>
                             For diagnosis <strong className="text-slate-800 dark:text-slate-100">{selectedDiag}</strong>, historical claims follow

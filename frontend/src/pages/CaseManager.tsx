@@ -99,11 +99,10 @@ export const CaseManager: React.FC = () => {
               <div
                 key={c.id}
                 onClick={() => setSelectedCase(c)}
-                className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                  selectedCase?.id === c.id
+                className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedCase?.id === c.id
                     ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-700 shadow-sm'
                     : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div>
@@ -171,7 +170,8 @@ const CaseDetail: React.FC<CaseDetailProps> = ({ case: caseData, onUpdate, onAdd
   useEffect(() => {
     setStatus(caseData.status);
     setAssignedTo(caseData.assignedTo || '');
-  }, [caseData]);
+    setNoteContent(''); // Reset note input when switching case
+  }, [caseData.id]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -372,7 +372,7 @@ const CaseDetail: React.FC<CaseDetailProps> = ({ case: caseData, onUpdate, onAdd
 
       {/* Footer Actions */}
       <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3">
-        <Button variant="outline" onClick={() => {}}>
+        <Button variant="outline" onClick={() => { }}>
           <Paperclip className="w-4 h-4" />
           Attach Evidence
         </Button>

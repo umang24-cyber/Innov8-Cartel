@@ -20,7 +20,7 @@ export interface Claim {
     z_score: number;
   };
   status?: 'Pending' | 'Investigating' | 'Cleared' | 'Rejected';
-  
+
   // New features: Anomaly Detection & Benford's Law
   anomalyScore?: number;
   benfordScore?: number;
@@ -109,4 +109,4 @@ export interface RiskDistribution {
   percentage: number;
 }
 
-export type ViewState = 'overview' | 'queue' | 'case_manager' | 'typology' | 'settings';
+export type ViewState = 'overview' | 'queue' | 'case_manager' | 'typology' | 'settings' | 'new_claim';
