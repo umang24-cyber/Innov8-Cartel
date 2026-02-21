@@ -848,15 +848,18 @@ async def get_dashboard_stats():
             pending_investigations=0, pending_trend=0,
             monthly_fraud_growth=0,
         )
+    # Include dynamically added claims in the total
+    total = len(df) + len(saved_claims_db)
     
-    total = len(df)
-    fraud_count = int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0
-    fraud_rate = (fraud_count / total * 100) if total > 0 else 0
-    
-    # Simulate high-risk alerts as claims with amount > 2 std devs above mean
     mean_amt = df["Total_Claim_Amount"].mean()
     std_amt = df["Total_Claim_Amount"].std()
-    high_risk = int((df["Total_Claim_Amount"] > mean_amt + 1.5 * std_amt).sum())
+    
+    # Check if any dynamically added claims are high risk
+    high_risk_dynamic = sum(1 for claim in saved_claims_db if claim.get("Total_Claim_Amount", 0) > mean_amt + 1.5 * std_amt)
+    
+    fraud_count = (int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0) + high_risk_dynamic
+    fraud_rate = (fraud_count / total * 100) if total > 0 else 0
+    high_risk = int((df["Total_Claim_Amount"] > mean_amt + 1.5 * std_amt).sum()) + high_risk_dynamic
     
     # Pending investigations = fraud cases not yet at extremes
     pending = max(0, fraud_count - high_risk)
@@ -884,8 +887,13 @@ async def get_fraud_trends():
     if df is None or df.empty:
         return []
     
-    total = len(df)
-    fraud_count = int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0
+    total = len(df) + len(saved_claims_db)
+    
+    mean_amt = df["Total_Claim_Amount"].mean()
+    std_amt = df["Total_Claim_Amount"].std()
+    dynamic_fraud = sum(1 for c in saved_claims_db if c.get("Total_Claim_Amount", 0) > mean_amt + 1.5 * std_amt)
+    
+    fraud_count = (int(df["Is_Fraud"].sum()) if "Is_Fraud" in df.columns else 0) + dynamic_fraud
     daily_avg_claims = max(1, total // 30)
     daily_avg_fraud = max(1, fraud_count // 30)
     
@@ -913,12 +921,11 @@ async def get_risk_distribution():
     if df is None or df.empty:
         return []
     
-    total = len(df)
+    total = len(df) + len(saved_claims_db)
     if "Is_Fraud" not in df.columns:
         return []
     
     fraud_count = int(df["Is_Fraud"].sum())
-    legit_count = total - fraud_count
     
     mean_amt = df["Total_Claim_Amount"].mean()
     std_amt = df["Total_Claim_Amount"].std()
@@ -927,6 +934,16 @@ async def get_risk_distribution():
     critical = int((df["Total_Claim_Amount"] > mean_amt + 2 * std_amt).sum())
     high = int(((df["Total_Claim_Amount"] > mean_amt + std_amt) & (df["Total_Claim_Amount"] <= mean_amt + 2 * std_amt)).sum())
     medium = int(((df["Total_Claim_Amount"] > mean_amt) & (df["Total_Claim_Amount"] <= mean_amt + std_amt)).sum())
+    
+    for claim in saved_claims_db:
+        amt = claim.get("Total_Claim_Amount", 0)
+        if amt > mean_amt + 2 * std_amt:
+            critical += 1
+        elif amt > mean_amt + std_amt:
+            high += 1
+        elif amt > mean_amt:
+            medium += 1
+            
     low = total - critical - high - medium
     
     result = [
@@ -1073,33 +1090,6 @@ async def get_claim(claim_id: str):
         raise HTTPException(status_code=404, detail="Claim not found")
     return claim
 
-@app.get("/fraud_trends")
-async def get_fraud_trends():
-    """Get fraud trends for the last 30 days"""
-    # Mock data - in production, query from database
-    import random
-    from datetime import datetime, timedelta
-    
-    trends = []
-    for i in range(30):
-        date = (datetime.now() - timedelta(days=29-i)).strftime("%Y-%m-%d")
-        trends.append({
-            "date": date,
-            "fraudCount": random.randint(5, 25),
-            "totalClaims": random.randint(200, 500),
-        })
-    return trends
-
-@app.get("/risk_distribution")
-async def get_risk_distribution():
-    """Get risk level distribution"""
-    # Mock data - in production, calculate from database
-    return [
-        {"level": "Low", "count": 8500, "percentage": 59.5},
-        {"level": "Medium", "count": 4200, "percentage": 29.4},
-        {"level": "High", "count": 1200, "percentage": 8.4},
-        {"level": "Critical", "count": 384, "percentage": 2.7},
-    ]
 
 # Cases endpoints
 cases_db: list[dict] = []  # Mock database
