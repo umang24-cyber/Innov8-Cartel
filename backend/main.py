@@ -819,6 +819,20 @@ async def get_dashboard_stats():
         pending_investigations=89,
         pending_trend=-12
     )
+@app.get("/cases/{case_id}/notes")
+async def get_case_notes(case_id: str):
+    case = next((c for c in cases_db if c.get("id") == case_id), None)
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case.get("notes", [])
+
+
+@app.get("/alerts/count")
+async def get_alert_count():
+    # Counts cases with "High" priority
+    high_risk_count = len([c for c in cases_db if c.get("priority") == "High"])
+    return {"count": high_risk_count}
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Demo endpoint — returns pre-built sample claims for the UI demo table
