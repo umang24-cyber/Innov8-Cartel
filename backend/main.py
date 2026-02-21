@@ -43,7 +43,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import shap
-from groq import Groq
+from openai import OpenAI
 import math
 
 from dotenv import load_dotenv
@@ -65,7 +65,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+MEGA_LLM_API_KEY = os.getenv("MEGA_LLM_API_KEY", "")
 MODEL_PATH   = "fraud_model.joblib"
 
 # MUST match train_model.py exactly — same column names, same order
@@ -104,7 +104,7 @@ class AppState:
     pipeline:     Any       = None   # the full fitted imblearn Pipeline
     explainer:    Any       = None   # SHAP TreeExplainer around the RF
     feature_names: list[str] = []    # OHE-expanded feature names
-    groq_client:  Any       = None   # Groq API client
+    llm_client:  Any       = None   # megallm  API client
     isolation_forest: Any   = None   # Isolation Forest for anomaly detection
     historical_claims: pd.DataFrame = None  # Historical data for Benford's Law
 
@@ -154,11 +154,15 @@ async def lifespan(app_instance):
     log.info("✅  SHAP TreeExplainer ready")
 
     # ── Initialize Groq client ────────────────────────────────────────────
-    if GROQ_API_KEY:
-        app_state.groq_client = Groq(api_key=GROQ_API_KEY)
-        log.info("✅  Groq client initialized")
+    # ── Initialize Mega LLM client ────────────────────────────────────────────
+    if MEGA_LLM_API_KEY:
+        app_state.llm_client = OpenAI(
+            base_url="https://ai.megallm.io/v1",
+            api_key=MEGA_LLM_API_KEY
+        )
+        log.info("✅  Mega LLM client initialized")
     else:
-        log.warning("⚠️  GROQ_API_KEY not set — LLM analysis will be skipped")
+        log.warning("⚠️  MEGA_LLM_API_KEY not set — LLM analysis will be skipped")
 
     # ── Initialize Isolation Forest for anomaly detection ─────────────────
     # Load historical claims data to train the Isolation Forest
@@ -419,40 +423,20 @@ def build_shap_outputs(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Helper: Groq LLM clinical note analysis
+# Helper: Mega LLM clinical note analysis (GLM-4.7)
 # ══════════════════════════════════════════════════════════════════════════════
-def analyze_with_groq(claim: "ClaimRequest", risk_score: int, shap_text: str) -> str:
-    """
-    Sends the claim context to Groq's LLaMA model acting as a medical auditor.
+def analyze_with_llm(claim: "ClaimRequest", risk_score: int, shap_text: str) -> str:
+    if not app_state.llm_client:
+        return "LLM analysis unavailable — MEGA_LLM_API_KEY not configured."
 
-    WHY Groq:
-      Groq's LPU (Language Processing Unit) hardware delivers extremely low
-      latency — typically <1 second for this prompt size. Critical for a
-      real-time dashboard that needs to feel snappy.
-
-    WHY llama-3.3-70b-versatile:
-      Large enough to have genuine medical billing knowledge, but fast enough
-      for interactive use. The 70B model understands ICD-10 codes, CPT codes,
-      and can reason about clinical appropriateness.
-    """
-    if not app_state.groq_client:
-        return "LLM analysis unavailable — GROQ_API_KEY not configured."
-
-    # Retrieve diagnosis-specific stats for context
     stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
 
-    # The system prompt defines the AI's persona and constraints.
-    # Being specific ("senior medical billing auditor") produces much better
-    # output than a generic "helpful assistant" prompt.
     system_prompt = """You are a senior medical billing auditor with 15+ years of 
 experience in healthcare fraud detection. Your role is ADVISORY ONLY — you 
 flag potential issues for human investigators but never make final decisions.
 Be concise, specific, and clinically accurate. Reference actual medical billing 
 standards when relevant."""
 
-    # The user prompt provides all context the model needs.
-    # We include the ML risk score and SHAP finding so the LLM can
-    # integrate structured and unstructured signals in its response.
     user_prompt = f"""Analyze this healthcare claim for potential fraud indicators:
 
 CLAIM DETAILS:
@@ -475,22 +459,28 @@ Your task:
 Respond in exactly 3 sentences. Be specific about amounts, codes, and clinical reasoning."""
 
     try:
-        response = app_state.groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        response = app_state.llm_client.chat.completions.create(
+            model="glm-4.7", # Try changing this to "glm-4" if it still returns empty
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
             ],
-            temperature=0.1,      # very low → factual, consistent, reproducible
-            max_tokens=250,       # enforce brevity for the UI panel
+            temperature=0.1,
+            max_tokens=250,
         )
-        return response.choices[0].message.content.strip()
+        
+        # Safely extract the content
+        content = response.choices[0].message.content
+        
+        if content:
+            return content.strip()
+        else:
+            log.warning(f"Mega LLM returned an empty response. Raw data: {response}")
+            return "LLM analysis unavailable: Mega LLM returned a blank response. Check your terminal logs."
 
     except Exception as exc:
-        log.error(f"Groq API error: {exc}")
+        log.error(f"Mega LLM API error: {exc}")
         return f"LLM analysis unavailable: {str(exc)[:200]}"
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Main endpoint: POST /analyze_claim
 # ══════════════════════════════════════════════════════════════════════════════
@@ -591,10 +581,10 @@ async def analyze_claim(claim: ClaimRequest):
         log.warning(f"SHAP failed: {exc}")
         shap_explanation = f"SHAP analysis unavailable: {exc}"
 
-    # ── Layer C: Groq LLM Analysis ─────────────────────────────────────────
+    # ── Layer C: mega LLM Analysis ─────────────────────────────────────────
     # Pass both the SHAP finding and risk score so Groq can integrate
     # structured ML signals with its unstructured note analysis.
-    llm_analysis = analyze_with_groq(claim, risk_score, shap_explanation)
+    llm_analysis = analyze_with_llm(claim, risk_score, shap_explanation)
 
     # ── Layer D: Isolation Forest Anomaly Detection ────────────────────────
     anomaly_score = 1  # Default: normal
@@ -737,8 +727,8 @@ async def chat(req: ChatRequest):
     The claim_context (if provided) is injected into the system prompt
     so the AI can answer specifically about the current claim being viewed.
     """
-    if not app_state.groq_client:
-        return ChatResponse(reply="Groq API not configured. Please set GROQ_API_KEY.")
+    if not app_state.llm_client:
+        return ChatResponse(reply="megallm API not configured. Please set GROQ_API_KEY.")
 
     # Build context block if claim data is attached
     context_block = ""
@@ -763,20 +753,28 @@ Be concise, helpful, and always remind investigators that you are advisory only.
 Never recommend claim rejection — only flag items for human review."""
 
     try:
-        response = app_state.groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        response = app_state.llm_client.chat.completions.create(
+            model="glm-4.7", # Try changing this to "glm-4" if it still returns empty
             messages=[
                 {"role": "system",  "content": system},
                 {"role": "user",    "content": req.message},
             ],
-            temperature=0.3,
-            max_tokens=300,
+            temperature=0.7,
+            max_tokens=1500,
         )
-        return ChatResponse(reply=response.choices[0].message.content.strip())
+        
+        # Safely extract the content
+        content = response.choices[0].message.content
+        
+        if content:
+            return ChatResponse(reply=content.strip())
+        else:
+            log.warning(f"Mega LLM returned an empty response. Raw data: {response}")
+            return ChatResponse(reply="Error: Mega LLM returned a blank response. Check your terminal logs.")
+            
     except Exception as exc:
-        log.error(f"Chat Groq error: {exc}")
+        log.error(f"Chat Mega LLM error: {exc}")
         return ChatResponse(reply=f"Error: {str(exc)[:150]}")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Health check — used by frontend to verify backend is alive
