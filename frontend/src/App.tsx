@@ -8,6 +8,7 @@ import { Overview } from './pages/Overview';
 import { TypologyStudio } from './pages/TypologyStudio';
 import { CaseManager } from './pages/CaseManager';
 import { NewClaimPage } from './pages/NewClaimPage';
+import { Prologue } from './components/Prologue';
 import type { Claim, ViewState } from './types';
 import { api } from './services/api';
 import { Loader2, Activity, RefreshCw, Moon, Sun, Bell } from 'lucide-react';
@@ -25,7 +26,15 @@ function App() {
     const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showPrologue, setShowPrologue] = useState(() => {
+        return !sessionStorage.getItem('vericlaim_prologue_seen');
+    });
     const notifRef = useRef<HTMLDivElement>(null);
+
+    const handlePrologueComplete = () => {
+        sessionStorage.setItem('vericlaim_prologue_seen', 'true');
+        setShowPrologue(false);
+    };
 
     // Smooth tab transition handler
     const handleViewChange = (view: ViewState) => {
@@ -147,6 +156,10 @@ function App() {
     const investigatingClaims = claims.filter(c => c.status === 'Investigating');
     const totalFlagged = claims.filter(c => c.riskScore !== undefined && c.riskScore > 40).length;
 
+    if (showPrologue) {
+        return <Prologue onComplete={handlePrologueComplete} />;
+    }
+
     return (
         <div className="flex bg-slate-50 dark:bg-slate-900 min-h-screen text-slate-900 dark:text-slate-100 font-sans selection:bg-teal-500/30 selection:text-teal-900 overflow-hidden relative transition-colors duration-200">
 
@@ -161,7 +174,7 @@ function App() {
                 <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-100/30 dark:bg-blue-900/20 rounded-full blur-[100px] pointer-events-none"></div>
 
                 {/* Top Header Section */}
-                <header className="px-8 py-6 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl z-10 sticky top-0 shadow-sm">
+                <header className="px-8 py-6 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl z-50 sticky top-0 shadow-sm">
                     <div className="flex justify-between items-center">
                         <div>
                             <h1 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-700 to-cyan-600 dark:from-teal-400 dark:to-cyan-400 tracking-tight transition-all duration-300">

@@ -100,7 +100,19 @@ export const api = {
         try {
             const res = await fetch(`${API_BASE}/dashboard_stats`);
             if (!res.ok) throw new Error('Failed to fetch stats');
-            return await res.json();
+            const data = await res.json();
+            // Map backend snake_case to frontend camelCase
+            return {
+                totalClaims: data.total_claims ?? 0,
+                totalClaimsTrend: data.total_claims_trend ?? 0,
+                highRiskAlerts: data.high_risk_alerts ?? 0,
+                highRiskTrend: data.high_risk_trend ?? 0,
+                falsePositiveRate: data.false_positive_rate ?? 0,
+                falsePositiveTrend: data.false_positive_trend ?? 0,
+                pendingInvestigations: data.pending_investigations ?? 0,
+                pendingTrend: data.pending_trend ?? 0,
+                monthlyFraudGrowth: data.monthly_fraud_growth ?? 0,
+            } as DashboardStats;
         } catch (error) {
             console.error("API Error:", error);
             return null;
