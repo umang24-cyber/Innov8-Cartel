@@ -43,11 +43,13 @@ import numpy as np
 import pandas as pd
 import shap
 from groq import Groq
+import math
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from sklearn.ensemble import IsolationForest
 
 # ── Environment & logging setup ────────────────────────────────────────────────
 # load_dotenv() reads a .env file in the current directory.
@@ -101,6 +103,8 @@ class AppState:
     explainer:    Any       = None   # SHAP TreeExplainer around the RF
     feature_names: list[str] = []    # OHE-expanded feature names
     groq_client:  Any       = None   # Groq API client
+    isolation_forest: Any   = None   # Isolation Forest for anomaly detection
+    historical_claims: pd.DataFrame = None  # Historical data for Benford's Law
 
 
 app_state = AppState()
@@ -153,6 +157,29 @@ async def lifespan(app_instance):
         log.info("✅  Groq client initialized")
     else:
         log.warning("⚠️  GROQ_API_KEY not set — LLM analysis will be skipped")
+
+    # ── Initialize Isolation Forest for anomaly detection ─────────────────
+    # Load historical claims data to train the Isolation Forest
+    try:
+        csv_path = "synthetic_claims.csv"
+        if os.path.exists(csv_path):
+            app_state.historical_claims = pd.read_csv(csv_path)
+            # Prepare features for Isolation Forest (same as ML model)
+            X_hist = app_state.historical_claims[ALL_FEATURES]
+            X_hist_transformed = preprocessor.transform(X_hist)
+            
+            # Train Isolation Forest on historical data
+            app_state.isolation_forest = IsolationForest(
+                contamination=0.1,  # Expect ~10% anomalies
+                random_state=42,
+                n_estimators=100
+            )
+            app_state.isolation_forest.fit(X_hist_transformed)
+            log.info("✅  Isolation Forest trained and ready")
+        else:
+            log.warning("⚠️  synthetic_claims.csv not found — Isolation Forest unavailable")
+    except Exception as exc:
+        log.warning(f"⚠️  Isolation Forest initialization failed: {exc}")
 
     yield  # ← server runs here, handling requests
 
@@ -219,6 +246,9 @@ class ClaimResponse(BaseModel):
       shap_details      → data for the SHAP bar chart
       llm_text_analysis → Groq's auditor finding
       advisory_note     → always-present disclaimer banner
+      anomaly_score     → Isolation Forest anomaly detection (-1 = anomaly, 1 = normal)
+      benford_score     → Benford's Law deviation score (0-100, higher = more suspicious)
+      benford_analysis   → Human-readable Benford's Law explanation
     """
     risk_score:         int          # 0–100
     risk_label:         str          # "HIGH" | "MEDIUM" | "LOW"
@@ -227,6 +257,78 @@ class ClaimResponse(BaseModel):
     llm_text_analysis:  str          # Groq medical auditor finding
     diagnosis_stats:    dict         # mean/std for the diagnosed code (for UI display)
     advisory_note:      str          # mandatory disclaimer
+    anomaly_score:      int          # -1 = anomaly detected, 1 = normal
+    benford_score:      float        # 0-100, higher = more deviation from Benford's Law
+    benford_analysis:   str          # Human-readable explanation
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Helper: Benford's Law analysis
+# ══════════════════════════════════════════════════════════════════════════════
+def calculate_benford_score(claim_amount: float, historical_amounts: pd.Series) -> tuple[float, str]:
+    """
+    Calculates Benford's Law deviation score for a claim amount.
+    
+    Benford's Law states that in naturally occurring datasets, the probability
+    of a number starting with digit d is: P(d) = log10(1 + 1/d)
+    
+    This function checks:
+    1. If the claim's first digit matches the theoretical Benford distribution
+    2. If the provider's historical billing pattern shows suspicious digit clustering
+    
+    Returns:
+        - benford_score: 0-100, where higher = more suspicious deviation
+        - analysis: Human-readable explanation
+    """
+    if historical_amounts is None or len(historical_amounts) == 0:
+        return 0.0, "Benford's Law analysis unavailable — no historical data"
+    
+    # Extract first digit of the claim amount
+    amount_str = str(int(abs(claim_amount)))
+    first_digit = int(amount_str[0]) if amount_str[0].isdigit() else 0
+    
+    if first_digit == 0:
+        return 0.0, "Amount starts with 0 — Benford's Law not applicable"
+    
+    # Calculate expected frequency for this digit according to Benford's Law
+    expected_prob = math.log10(1 + 1.0 / first_digit)
+    
+    # Calculate actual frequency in historical data (provider's billing pattern)
+    historical_first_digits = historical_amounts.astype(str).str[0].astype(int)
+    historical_first_digits = historical_first_digits[historical_first_digits > 0]  # Remove zeros
+    
+    if len(historical_first_digits) == 0:
+        return 0.0, "Benford's Law analysis unavailable — insufficient historical data"
+    
+    # Count how often this digit appears in historical data
+    actual_count = (historical_first_digits == first_digit).sum()
+    actual_prob = actual_count / len(historical_first_digits)
+    
+    # Calculate deviation from Benford's Law
+    # If a provider's history shows clustering on digit 8 (which should be rare ~5.1%),
+    # that's suspicious
+    deviation = abs(actual_prob - expected_prob)
+    
+    # Convert to 0-100 score (higher = more suspicious)
+    # Maximum possible deviation is ~0.3 (for digit 1), so normalize
+    max_deviation = 0.3
+    benford_score = min(100, (deviation / max_deviation) * 100)
+    
+    # Build explanation
+    if deviation > 0.05:  # Significant deviation (>5 percentage points)
+        direction = "higher" if actual_prob > expected_prob else "lower"
+        analysis = (
+            f"⚠️ Benford's Law Alert: First digit '{first_digit}' appears {direction} than expected. "
+            f"Theoretical frequency: {expected_prob:.1%}, Historical pattern: {actual_prob:.1%}. "
+            f"This clustering may indicate fabricated amounts."
+        )
+    else:
+        analysis = (
+            f"✓ Benford's Law: First digit '{first_digit}' frequency ({actual_prob:.1%}) "
+            f"matches expected Benford distribution ({expected_prob:.1%})."
+        )
+    
+    return round(benford_score, 2), analysis
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -492,6 +594,35 @@ async def analyze_claim(claim: ClaimRequest):
     # structured ML signals with its unstructured note analysis.
     llm_analysis = analyze_with_groq(claim, risk_score, shap_explanation)
 
+    # ── Layer D: Isolation Forest Anomaly Detection ────────────────────────
+    anomaly_score = 1  # Default: normal
+    try:
+        if app_state.isolation_forest is not None:
+            # Use the same transformed features as the ML model
+            anomaly_prediction = app_state.isolation_forest.predict(X_transformed)
+            anomaly_score = int(anomaly_prediction[0])  # -1 = anomaly, 1 = normal
+            log.info(f"Isolation Forest: {'ANOMALY DETECTED' if anomaly_score == -1 else 'Normal'}")
+        else:
+            log.warning("Isolation Forest not available")
+    except Exception as exc:
+        log.warning(f"Isolation Forest failed: {exc}")
+
+    # ── Layer E: Benford's Law Analysis ───────────────────────────────────
+    benford_score = 0.0
+    benford_analysis = "Benford's Law analysis unavailable"
+    try:
+        if app_state.historical_claims is not None and len(app_state.historical_claims) > 0:
+            historical_amounts = app_state.historical_claims["Total_Claim_Amount"]
+            benford_score, benford_analysis = calculate_benford_score(
+                claim.Total_Claim_Amount,
+                historical_amounts
+            )
+            log.info(f"Benford's Law score: {benford_score:.2f}/100")
+        else:
+            log.warning("Historical claims data not available for Benford's Law")
+    except Exception as exc:
+        log.warning(f"Benford's Law calculation failed: {exc}")
+
     # ── Diagnosis stats for the frontend display ───────────────────────────
     stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
 
@@ -515,6 +646,9 @@ async def analyze_claim(claim: ClaimRequest):
             "No claim is automatically approved or rejected. "
             "All final decisions must be made by a qualified human investigator."
         ),
+        anomaly_score    = anomaly_score,
+        benford_score    = benford_score,
+        benford_analysis = benford_analysis,
     )
 
 

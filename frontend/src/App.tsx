@@ -22,14 +22,17 @@ function App() {
         setError(null);
         try {
             const data = await api.getDemoClaims();
-            if (data.length > 0) {
+            if (data && data.length > 0) {
                 setClaims(data);
             } else {
-                setError("Backend returned 0 claims. Is the synth data generated?");
+                // Don't set error if we get empty array - just show empty state
+                setClaims([]);
             }
         } catch (err) {
             console.error("Failed to load claims", err);
+            // Set error but don't prevent UI from rendering
             setError("Cannot connect to VeriClaim AI Core (localhost:8000). Please start the backend server.");
+            setClaims([]); // Set empty array so UI can still render
         } finally {
             setIsLoadingInit(false);
         }
@@ -62,10 +65,15 @@ function App() {
                         ? {
                             ...c,
                             riskScore: result.risk_score,
-                            riskLevel: result.risk_label,
+                            riskLevel: result.risk_label === 'HIGH' ? 'High' : 
+                                      result.risk_label === 'MEDIUM' ? 'Medium' : 
+                                      result.risk_label === 'LOW' ? 'Low' : 'Low',
                             shapValues: result.shap_details,
                             llmAnalysis: result.llm_text_analysis,
                             diagnosisStats: result.diagnosis_stats,
+                            anomalyScore: result.anomaly_score,
+                            benfordScore: result.benford_score,
+                            benfordAnalysis: result.benford_analysis,
                             status: result.risk_score > 60 ? 'Investigating' : 'Pending'
                         }
                         : c
@@ -135,9 +143,14 @@ function App() {
                                 </div>
                                 <h2 className="text-xl font-bold text-slate-800 mb-2">Connection Error</h2>
                                 <p className="text-slate-600 font-medium mb-6">{error}</p>
-                                <button onClick={fetchClaims} className="bg-teal-600 text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-teal-500 transition-colors">
-                                    Retry Connection
-                                </button>
+                                <div className="flex gap-3 justify-center">
+                                    <button onClick={fetchClaims} className="bg-teal-600 text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-teal-500 transition-colors">
+                                        Retry Connection
+                                    </button>
+                                    <button onClick={() => setError(null)} className="bg-slate-200 text-slate-700 px-6 py-2 rounded-lg font-bold hover:bg-slate-300 transition-colors">
+                                        Continue Anyway
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}

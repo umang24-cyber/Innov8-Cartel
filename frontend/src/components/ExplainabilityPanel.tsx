@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Claim } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { X, FileText, CheckCircle, ShieldAlert, HeartPulse } from 'lucide-react';
+import { X, FileText, CheckCircle, ShieldAlert, HeartPulse, AlertTriangle, TrendingUp } from 'lucide-react';
 
 interface ExplainabilityPanelProps {
     claim: Claim | null;
@@ -11,10 +11,11 @@ interface ExplainabilityPanelProps {
 const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClose }) => {
     if (!claim) return null;
 
-    // Use raw values if available, otherwise map the display value back
+    // Map SHAP values for chart display
+    // Backend returns: { feature, value, display }
     const data = claim.shapValues?.map(shap => ({
-        feature: shap.display,
-        impact: shap.impact || 0 // Use raw impact for direction/bars
+        feature: shap.display || shap.feature,
+        impact: shap.value || 0
     })) || [];
 
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -102,6 +103,81 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
+                        </div>
+                    </section>
+                )}
+
+                {/* Isolation Forest Anomaly Detection */}
+                {claim.anomalyScore !== undefined && (
+                    <section>
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3 flex items-center">
+                            <AlertTriangle className="mr-2 text-orange-500" size={14} />
+                            Anomaly Detection (Isolation Forest)
+                        </h3>
+                        <div className={`p-4 rounded-xl border shadow-sm ${
+                            claim.anomalyScore === -1 
+                                ? 'bg-orange-50/80 border-orange-200' 
+                                : 'bg-teal-50/50 border-teal-100'
+                        }`}>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className={`text-sm font-bold ${
+                                    claim.anomalyScore === -1 ? 'text-orange-700' : 'text-teal-700'
+                                }`}>
+                                    {claim.anomalyScore === -1 ? '⚠️ ANOMALY DETECTED' : '✓ Normal Pattern'}
+                                </span>
+                                <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+                                    claim.anomalyScore === -1 
+                                        ? 'bg-orange-100 text-orange-700' 
+                                        : 'bg-teal-100 text-teal-700'
+                                }`}>
+                                    {claim.anomalyScore === -1 ? 'Anomaly' : 'Normal'}
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-600 font-medium mt-2">
+                                {claim.anomalyScore === -1 
+                                    ? "This claim exhibits statistical patterns that deviate significantly from normal billing behavior. Recommend investigation."
+                                    : "This claim's pattern matches expected statistical distributions in the dataset."}
+                            </p>
+                        </div>
+                    </section>
+                )}
+
+                {/* Benford's Law Analysis */}
+                {claim.benfordScore !== undefined && claim.benfordAnalysis && (
+                    <section>
+                        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-widest mb-3 flex items-center">
+                            <TrendingUp className="mr-2 text-purple-500" size={14} />
+                            Benford's Law Analysis
+                        </h3>
+                        <div className={`p-4 rounded-xl border shadow-sm ${
+                            claim.benfordScore > 50 
+                                ? 'bg-purple-50/80 border-purple-200' 
+                                : 'bg-slate-50 border-slate-200'
+                        }`}>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs text-slate-600 uppercase tracking-wider font-bold">
+                                    Deviation Score
+                                </span>
+                                <span className={`text-sm font-extrabold ${
+                                    claim.benfordScore > 50 ? 'text-purple-700' : 'text-slate-700'
+                                }`}>
+                                    {claim.benfordScore.toFixed(1)}/100
+                                </span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-2 mb-3">
+                                <div 
+                                    className={`h-2 rounded-full transition-all ${
+                                        claim.benfordScore > 50 ? 'bg-purple-500' : 'bg-teal-500'
+                                    }`}
+                                    style={{ width: `${Math.min(claim.benfordScore, 100)}%` }}
+                                ></div>
+                            </div>
+                            <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                                {claim.benfordAnalysis}
+                            </p>
+                            <p className="text-[10px] text-slate-500 mt-2 italic">
+                                Benford's Law detects unnatural number distributions that may indicate fabricated amounts.
+                            </p>
                         </div>
                     </section>
                 )}

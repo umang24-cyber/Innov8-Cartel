@@ -1,4 +1,4 @@
-import { Claim } from '../types';
+import type { Claim } from '../types';
 
 const API_BASE = 'http://localhost:8000';
 

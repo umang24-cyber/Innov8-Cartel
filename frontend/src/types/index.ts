@@ -11,7 +11,7 @@ export interface Claim {
   // Enriched fields from ML Backend
   riskScore?: number;
   riskLevel?: RiskLevel;
-  shapValues?: { feature: string; impact: number; display: string }[];
+  shapValues?: { feature: string; value: number; display: string }[];
   llmAnalysis?: string;
   diagnosisStats?: {
     expected_mean: number;
@@ -19,6 +19,11 @@ export interface Claim {
     z_score: number;
   };
   status?: 'Pending' | 'Investigating' | 'Cleared' | 'Rejected';
+  
+  // New features: Anomaly Detection & Benford's Law
+  anomalyScore?: number; // -1 = anomaly, 1 = normal
+  benfordScore?: number; // 0-100, higher = more suspicious
+  benfordAnalysis?: string; // Human-readable explanation
 }
 
 export interface Metric {
