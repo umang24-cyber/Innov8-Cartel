@@ -933,7 +933,7 @@ async def demo_claims(
     provider_filter: Optional[str] = None
 ):
     """
-    Returns sample claims, now supporting search and filtering from the UI.
+    Returns sample claims + locally saved claims, now supporting search and filtering from the UI.
     """
     claims = [
         {"claim_id": "CLM-8492", "Provider_ID": "PRV-0007", "Diagnosis_Code": "J06.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 15000, "Unstructured_Notes": "Mild sore throat, prescribed lozenges."},
@@ -945,6 +945,9 @@ async def demo_claims(
         {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "Diagnosis_Code": "F32.1",  "Procedure_Code": "90837", "Total_Claim_Amount": 420,   "Unstructured_Notes": "60-minute psychotherapy session. Patient reporting improved mood."},
         {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 260,   "Unstructured_Notes": "Endoscopy showed mild esophageal irritation. Prescribed PPI."},
     ]
+    
+    # Append the globally stored dynamic claims
+    claims.extend(saved_claims_db)
 
     # Apply Search Logic
     if search:
@@ -1019,6 +1022,18 @@ app.mount("/assets", StaticFiles(directory="../frontend/dist/assets"), name="ass
 async def get_claims():
     """Get all claims (same as demo_claims for now)"""
     return await demo_claims()
+
+saved_claims_db: list[dict] = []  # Mock database for dynamically saved claims
+
+@app.post("/claims")
+async def save_claim(claim_data: dict):
+    """Save a new claim dynamically"""
+    if "claim_id" not in claim_data:
+        claim_data["claim_id"] = f"MAN-{int(datetime.now().timestamp())}"
+    
+    saved_claims_db.append(claim_data)
+    
+    return {"message": "Claim saved successfully", "claim": claim_data}
 
 @app.get("/claims/{claim_id}")
 async def get_claim(claim_id: str):

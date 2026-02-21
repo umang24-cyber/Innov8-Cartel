@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, Loader2, AlertTriangle, CheckCircle, RotateCcw, FileText, ShieldAlert, TrendingUp } from 'lucide-react';
+import { Send, Loader2, AlertTriangle, CheckCircle, RotateCcw, FileText, ShieldAlert, TrendingUp, Save } from 'lucide-react';
 import { api } from '../services/api';
 import type { Claim } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -15,6 +15,8 @@ export const NewClaimPage: React.FC = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     const diagnosisCodes = [
         { code: 'J06.9', label: 'Acute Upper Respiratory Infection' },
@@ -46,6 +48,7 @@ export const NewClaimPage: React.FC = () => {
         e.preventDefault();
         setError(null);
         setResult(null);
+        setSaveSuccess(false);
 
         if (!formData.Provider_ID || !formData.Diagnosis_Code || !formData.Procedure_Code || !formData.Total_Claim_Amount) {
             setError('Please fill in all required fields.');
@@ -77,6 +80,31 @@ export const NewClaimPage: React.FC = () => {
         setFormData({ Provider_ID: '', Diagnosis_Code: '', Procedure_Code: '', Total_Claim_Amount: '', Unstructured_Notes: '' });
         setResult(null);
         setError(null);
+        setSaveSuccess(false);
+    };
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!result) return;
+
+        setIsSaving(true);
+        setError(null);
+        try {
+            const claimData = {
+                Provider_ID: formData.Provider_ID,
+                Diagnosis_Code: formData.Diagnosis_Code,
+                Procedure_Code: formData.Procedure_Code,
+                Total_Claim_Amount: parseFloat(formData.Total_Claim_Amount),
+                Unstructured_Notes: formData.Unstructured_Notes || 'Manual claim submission.',
+            };
+            await api.saveClaim(claimData);
+            setSaveSuccess(true);
+        } catch (err) {
+            console.error('Failed to save claim', err);
+            setError('Failed to save claim. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const shapData = result?.shap_details?.map((s: any) => ({
@@ -185,6 +213,17 @@ export const NewClaimPage: React.FC = () => {
                                 className="flex-1 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white py-3 rounded-xl text-sm font-bold transition-all shadow-md shadow-teal-500/20 hover:shadow-lg transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {isAnalyzing ? <><Loader2 size={16} className="animate-spin" /> Running Pipeline...</> : <><Send size={16} /> Analyze Claim</>}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSave}
+                                disabled={!result || isSaving || saveSuccess}
+                                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-md transform flex items-center justify-center gap-2 ${(!result || isSaving || saveSuccess)
+                                        ? 'bg-slate-300 dark:bg-slate-600 text-slate-500 cursor-not-allowed opacity-50'
+                                        : 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white shadow-indigo-500/20 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+                                    }`}
+                            >
+                                {isSaving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : saveSuccess ? <><CheckCircle size={16} /> Saved!</> : <><Save size={16} /> Save Claim</>}
                             </button>
                             <button
                                 type="button"

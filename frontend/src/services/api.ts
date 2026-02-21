@@ -65,6 +65,22 @@ export const api = {
         }
     },
 
+    // Save a new dynamic claim to the backend
+    saveClaim: async (claimData: any) => {
+        try {
+            const res = await fetch(`${API_BASE}/claims`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(claimData),
+            });
+            if (!res.ok) throw new Error('Failed to save claim');
+            return await res.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    },
+
     // 3. Chat with Groq Agentic LLM
     chat: async (message: string, claimContext: Claim | null) => {
         try {
