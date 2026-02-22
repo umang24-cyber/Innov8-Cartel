@@ -479,8 +479,8 @@ CLAIM DETAILS:
 - Provider ID: {claim.Provider_ID}
 - Diagnosis Code: {claim.Diagnosis_Code}
 - Procedure Code: {claim.Procedure_Code}
-- Billed Amount: ${claim.Total_Claim_Amount:,.2f}
-- Expected Range for {claim.Diagnosis_Code}: ${stats['mean']-stats['std']:,.0f} – ${stats['mean']+stats['std']:,.0f}
+- Billed Amount: ₹{claim.Total_Claim_Amount:,.2f}
+- Expected Range for {claim.Diagnosis_Code}: ₹{stats['mean']-stats['std']:,.0f} – ₹{stats['mean']+stats['std']:,.0f}
 - ML Risk Score: {risk_score}/100
 - ML Finding: {shap_text}
 
@@ -834,7 +834,7 @@ Currently reviewing claim:
 - Provider: {ctx.get('Provider_ID', 'N/A')}
 - Diagnosis: {ctx.get('Diagnosis_Code', 'N/A')}
 - Procedure: {ctx.get('Procedure_Code', 'N/A')}
-- Billed: ${ctx.get('Total_Claim_Amount', 0):,.2f}
+- Billed: ₹{ctx.get('Total_Claim_Amount', 0):,.2f}
 - Risk Score: {ctx.get('risk_score', 'N/A')}/100
 - ML Finding: {ctx.get('shap_explanation', 'N/A')}
 - Doctor's Note: "{ctx.get('Unstructured_Notes', 'N/A')}"
