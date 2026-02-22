@@ -100,8 +100,8 @@ export const CaseManager: React.FC = () => {
                 key={c.id}
                 onClick={() => setSelectedCase(c)}
                 className={`p-4 rounded-xl border cursor-pointer transition-all ${selectedCase?.id === c.id
-                    ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-700 shadow-sm'
-                    : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  ? 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-700 shadow-sm'
+                  : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -161,17 +161,61 @@ interface CaseDetailProps {
   onAddNote: (content: string) => Promise<void>;
 }
 
+interface EvidenceItem {
+  id: string;
+  type: 'file' | 'link';
+  name: string;
+  url: string; // data URI for files, URL for links
+  addedAt: string;
+}
+
+const DEFAULT_ASSIGNEES = [
+  'Arjun Sharma',
+  'Priya Patel',
+  'Vikram Mehta',
+  'Sneha Iyer',
+  'Rahul Gupta',
+];
+
+const getStoredAssignees = (): string[] => {
+  try {
+    const raw = localStorage.getItem('vericlaim_custom_assignees');
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
+const getStoredEvidence = (caseId: string): EvidenceItem[] => {
+  try {
+    const raw = localStorage.getItem(`vericlaim_evidence_${caseId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+};
+
 const CaseDetail: React.FC<CaseDetailProps> = ({ case: caseData, onUpdate, onAddNote }) => {
   const [status, setStatus] = useState(caseData.status);
   const [assignedTo, setAssignedTo] = useState(caseData.assignedTo || '');
   const [noteContent, setNoteContent] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Assignee management
+  const [customAssignees, setCustomAssignees] = useState<string[]>(getStoredAssignees());
+  const [showAddPerson, setShowAddPerson] = useState(false);
+  const [newPersonName, setNewPersonName] = useState('');
+
+  // Evidence management
+  const [showEvidenceModal, setShowEvidenceModal] = useState(false);
+  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>(getStoredEvidence(caseData.id));
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [newLinkName, setNewLinkName] = useState('');
+
   useEffect(() => {
     setStatus(caseData.status);
     setAssignedTo(caseData.assignedTo || '');
-    setNoteContent(''); // Reset note input when switching case
+    setNoteContent('');
+    setEvidenceItems(getStoredEvidence(caseData.id));
   }, [caseData.id]);
+
+  const allAssignees = [...DEFAULT_ASSIGNEES, ...customAssignees];
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -187,6 +231,72 @@ const CaseDetail: React.FC<CaseDetailProps> = ({ case: caseData, onUpdate, onAdd
     if (!noteContent.trim()) return;
     await onAddNote(noteContent);
     setNoteContent('');
+  };
+
+  const handleAddPerson = () => {
+    const name = newPersonName.trim();
+    if (!name || allAssignees.includes(name)) {
+      setNewPersonName('');
+      setShowAddPerson(false);
+      return;
+    }
+    const updated = [...customAssignees, name];
+    setCustomAssignees(updated);
+    localStorage.setItem('vericlaim_custom_assignees', JSON.stringify(updated));
+    setAssignedTo(name);
+    setNewPersonName('');
+    setShowAddPerson(false);
+    toast.success(`${name} added to assignees`);
+  };
+
+  // Evidence helpers
+  const saveEvidence = (items: EvidenceItem[]) => {
+    setEvidenceItems(items);
+    localStorage.setItem(`vericlaim_evidence_${caseData.id}`, JSON.stringify(items));
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const newItem: EvidenceItem = {
+          id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          type: 'file',
+          name: file.name,
+          url: reader.result as string,
+          addedAt: new Date().toISOString(),
+        };
+        saveEvidence([...evidenceItems, newItem]);
+        toast.success(`File "${file.name}" attached`);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const handleAddLink = () => {
+    const url = newLinkUrl.trim();
+    const name = newLinkName.trim() || url;
+    if (!url) return;
+    const newItem: EvidenceItem = {
+      id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      type: 'link',
+      name,
+      url,
+      addedAt: new Date().toISOString(),
+    };
+    saveEvidence([...evidenceItems, newItem]);
+    setNewLinkUrl('');
+    setNewLinkName('');
+    toast.success('Link added as evidence');
+  };
+
+  const handleRemoveEvidence = (id: string) => {
+    const updated = evidenceItems.filter(e => e.id !== id);
+    saveEvidence(updated);
+    toast.info('Evidence removed');
   };
 
   const statusColors = {
@@ -291,18 +401,84 @@ const CaseDetail: React.FC<CaseDetailProps> = ({ case: caseData, onUpdate, onAdd
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
               Assigned To
             </label>
-            <select
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              <option value="">Unassigned</option>
-              <option value="John Doe">John Doe</option>
-              <option value="Jane Smith">Jane Smith</option>
-              <option value="Mike Johnson">Mike Johnson</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                className="flex-1 px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="">Unassigned</option>
+                {allAssignees.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowAddPerson(!showAddPerson)}
+                className="px-3 py-2 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700 rounded-xl hover:bg-teal-100 dark:hover:bg-teal-900/50 transition-colors font-bold text-lg"
+                title="Add new person"
+              >
+                +
+              </button>
+            </div>
+            {showAddPerson && (
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={newPersonName}
+                  onChange={(e) => setNewPersonName(e.target.value)}
+                  placeholder="Enter name..."
+                  className="flex-1 px-3 py-1.5 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddPerson()}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPerson}
+                  className="px-3 py-1.5 text-sm font-semibold bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Evidence Section */}
+        {evidenceItems.length > 0 && (
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 mb-4 flex items-center gap-2">
+              <Paperclip className="w-5 h-5" />
+              Attached Evidence ({evidenceItems.length})
+            </h3>
+            <div className="space-y-2">
+              {evidenceItems.map(item => (
+                <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`flex-shrink-0 px-2 py-0.5 text-xs font-bold rounded-md ${item.type === 'file' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'}`}>
+                      {item.type === 'file' ? 'FILE' : 'LINK'}
+                    </span>
+                    {item.type === 'link' ? (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-teal-600 dark:text-teal-400 hover:underline truncate">
+                        {item.name}
+                      </a>
+                    ) : (
+                      <a href={item.url} download={item.name} className="text-sm font-medium text-teal-600 dark:text-teal-400 hover:underline truncate">
+                        {item.name}
+                      </a>
+                    )}
+                    <span className="text-xs text-slate-400 flex-shrink-0">{formatRelativeTime(item.addedAt)}</span>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveEvidence(item.id)}
+                    className="flex-shrink-0 ml-2 text-xs text-rose-500 hover:text-rose-700 font-semibold"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Notes Section */}
         <div>
@@ -372,7 +548,7 @@ const CaseDetail: React.FC<CaseDetailProps> = ({ case: caseData, onUpdate, onAdd
 
       {/* Footer Actions */}
       <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3">
-        <Button variant="outline" onClick={() => { }}>
+        <Button variant="outline" onClick={() => setShowEvidenceModal(!showEvidenceModal)}>
           <Paperclip className="w-4 h-4" />
           Attach Evidence
         </Button>
@@ -381,6 +557,95 @@ const CaseDetail: React.FC<CaseDetailProps> = ({ case: caseData, onUpdate, onAdd
           Save Changes
         </Button>
       </div>
+
+      {/* Evidence Modal */}
+      {showEvidenceModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowEvidenceModal(false)}>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-slate-200 dark:border-slate-700">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Paperclip className="w-5 h-5 text-teal-600" />
+                Attach Evidence
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Upload files or add links as evidence for this case</p>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Upload Files</label>
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl cursor-pointer hover:border-teal-400 dark:hover:border-teal-600 hover:bg-teal-50/50 dark:hover:bg-teal-900/10 transition-colors">
+                  <div className="text-center">
+                    <Paperclip className="w-6 h-6 text-slate-400 mx-auto mb-1" />
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Click to upload or drag files</p>
+                    <p className="text-xs text-slate-400">PDF, images, documents, spreadsheets</p>
+                  </div>
+                  <input type="file" className="hidden" multiple onChange={handleFileUpload} accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.csv,.txt" />
+                </label>
+              </div>
+
+              {/* Link Input */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">Add Link</label>
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={newLinkName}
+                    onChange={e => setNewLinkName(e.target.value)}
+                    placeholder="Link label (optional)"
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={newLinkUrl}
+                      onChange={e => setNewLinkUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="flex-1 px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      onKeyDown={e => e.key === 'Enter' && handleAddLink()}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddLink}
+                      disabled={!newLinkUrl.trim()}
+                      className="px-4 py-2 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Evidence in Modal */}
+              {evidenceItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Attached ({evidenceItems.length})</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {evidenceItems.map(item => (
+                      <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`px-1.5 py-0.5 text-xs font-bold rounded ${item.type === 'file' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'}`}>
+                            {item.type === 'file' ? '📄' : '🔗'}
+                          </span>
+                          <span className="truncate text-slate-700 dark:text-slate-300">{item.name}</span>
+                        </div>
+                        <button onClick={() => handleRemoveEvidence(item.id)} className="text-xs text-rose-500 hover:text-rose-700 font-semibold flex-shrink-0 ml-2">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+              <button
+                onClick={() => setShowEvidenceModal(false)}
+                className="px-6 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
