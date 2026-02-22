@@ -241,6 +241,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                                 </div>
                             ))}
                         </div>
+
+                        {/* Scroll guide */}
+                        <button onClick={() => modelRef.current?.scrollIntoView({ behavior: 'smooth' })} className="mt-12 mx-auto flex flex-col items-center gap-2 text-teal-400 hover:text-teal-300 transition-all cursor-pointer group">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.3em]" style={subtleShadow}>Our Model</span>
+                            <ChevronDown size={20} className="animate-bounce drop-shadow-lg" />
+                        </button>
                     </div>
                 </section>
 
@@ -269,7 +275,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                             {[
                                 { icon: <Brain className="w-6 h-6" />, layer: 'Layer A', title: 'Random Forest Classifier', desc: 'Trained on historical claims data with SMOTE oversampling. Outputs fraud probability 0-100%. SHAP TreeExplainer provides per-feature attribution.', color: 'from-teal-500 to-emerald-500', glow: 'shadow-teal-500/20' },
                                 { icon: <Layers className="w-6 h-6" />, layer: 'Layer B', title: 'Isolation Forest (Anomaly Detection)', desc: 'Unsupervised model scoring how "anomalous" each claim is relative to historical distribution using claim amount and severity features.', color: 'from-cyan-500 to-blue-500', glow: 'shadow-cyan-500/20' },
-                                { icon: <BarChart3 className="w-6 h-6" />, layer: 'Layer C', title: 'LLM Clinical Audit (Groq + Mega)', desc: "Groq reads unstructured doctor's notes to verify clinical documentation justifies billed procedures. Mega LLM powers the investigator chatbot.", color: 'from-indigo-500 to-purple-500', glow: 'shadow-indigo-500/20' },
+                                { icon: <BarChart3 className="w-6 h-6" />, layer: 'Layer C', title: 'LLM Clinical Audit (Groq + MegaLLM ❤️)', desc: "Groq reads unstructured doctor's notes to verify clinical documentation justifies billed procedures. MegaLLM powers the interactive investigator chatbot for deep-dive queries.", color: 'from-indigo-500 to-purple-500', glow: 'shadow-indigo-500/20' },
                             ].map((layer, i) => (
                                 <div
                                     key={i}
@@ -288,6 +294,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                                 </div>
                             ))}
                         </div>
+
+                        {/* MegaLLM Thank You */}
+                        <div className="mt-12 text-center">
+                            <div className="inline-block bg-white/[0.04] backdrop-blur-xl border border-indigo-500/20 rounded-2xl px-8 py-5 relative overflow-hidden group hover:border-indigo-400/30 transition-all">
+                                <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none"><div className="glint-sweep-slow" /></div>
+                                <p className="text-lg mb-1" style={subtleShadow}>
+                                    <span className="text-2xl">❤️</span>
+                                </p>
+                                <p className="text-slate-200 text-sm font-bold mb-1" style={subtleShadow}>
+                                    Heartfelt thanks to{' '}
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 font-black">MegaLLM</span>
+                                </p>
+                                <p className="text-slate-400 text-xs leading-relaxed max-w-md" style={subtleShadow}>
+                                    For extending their generous support and making our AI model possible.
+                                    Your infrastructure powers the investigator chatbot at the heart of VeriClaim.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Scroll guide */}
+                        <button onClick={() => scrollContainerRef.current?.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' })} className="mt-10 mx-auto flex flex-col items-center gap-2 text-teal-400 hover:text-teal-300 transition-all cursor-pointer">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.3em]" style={subtleShadow}>Continue</span>
+                            <ChevronDown size={20} className="animate-bounce drop-shadow-lg" />
+                        </button>
                     </div>
                 </section>
 
