@@ -322,7 +322,7 @@ function App() {
                     )}
 
                     {/* Page Routing */}
-                    {currentView === 'overview' && <Overview />}
+                    {currentView === 'overview' && <Overview userEmail={user?.email} />}
 
                     {currentView === 'queue' && (
                         <div className="flex gap-6 h-full">
@@ -350,7 +350,7 @@ function App() {
 
                     {currentView === 'case_manager' && <CaseManager />}
                     {currentView === 'typology' && <TypologyStudio />}
-                    {currentView === 'new_claim' && <NewClaimPage />}
+                    {currentView === 'new_claim' && <NewClaimPage userEmail={user?.email} />}
                     {currentView === 'ayushman_portal' && <AyushmanPortal />}
 
                     {currentView === 'settings' && (

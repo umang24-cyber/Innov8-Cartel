@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import type { Claim } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export const NewClaimPage: React.FC = () => {
+export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) => {
     const [formData, setFormData] = useState({
         Provider_ID: '',
         ABHA_ID: '91-4567-8912-3456',
@@ -104,6 +104,16 @@ export const NewClaimPage: React.FC = () => {
                 Unstructured_Notes: formData.Unstructured_Notes || 'Manual claim submission.',
             };
             await api.saveClaim(claimData);
+            // Also save to user-specific localStorage
+            if (userEmail) {
+                const storageKey = `vericlaim_claims_${userEmail}`;
+                try {
+                    const raw = localStorage.getItem(storageKey);
+                    const existing = raw ? JSON.parse(raw) : [];
+                    existing.push({ ...claimData, claim_id: `MAN-${Date.now().toString(36).toUpperCase()}`, status: 'Pending' });
+                    localStorage.setItem(storageKey, JSON.stringify(existing));
+                } catch { /* ignore */ }
+            }
             setSaveSuccess(true);
         } catch (err) {
             console.error('Failed to save claim', err);
@@ -249,8 +259,8 @@ export const NewClaimPage: React.FC = () => {
                                 onClick={handleSave}
                                 disabled={!result || isSaving || saveSuccess}
                                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all shadow-md transform flex items-center justify-center gap-2 ${(!result || isSaving || saveSuccess)
-                                        ? 'bg-slate-300 dark:bg-slate-600 text-slate-500 cursor-not-allowed opacity-50'
-                                        : 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white shadow-indigo-500/20 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+                                    ? 'bg-slate-300 dark:bg-slate-600 text-slate-500 cursor-not-allowed opacity-50'
+                                    : 'bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white shadow-indigo-500/20 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
                                     }`}
                             >
                                 {isSaving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : saveSuccess ? <><CheckCircle size={16} /> Saved!</> : <><Save size={16} /> Save Claim</>}

@@ -25,7 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, user, onPr
                     <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-full h-full object-contain drop-shadow-md dark:brightness-110" />
                 </div>
                 <h1 className="text-xl font-extrabold tracking-wide text-slate-800 dark:text-white flex items-center">
-                    Veri<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-teal-400 dark:to-cyan-400">Claim</span>
+                    Veri<span className="text-cyan-500 dark:text-cyan-400">Claim</span>
                 </h1>
             </div>
 

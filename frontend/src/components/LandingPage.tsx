@@ -100,7 +100,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                 <div className="flex items-center gap-3 cursor-pointer" onClick={scrollToTop}>
                     <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-9 h-9 object-contain drop-shadow-lg animate-[logoFloat_3s_ease-in-out_infinite]" />
                     <span className="text-lg font-black text-white tracking-tight" style={subtleShadow}>
-                        Veri<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">Claim</span>
+                        Veri<span className="text-cyan-400">Claim</span>
                     </span>
                 </div>
                 <button
@@ -149,7 +149,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                                 <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-teal-400/20 to-cyan-400/20 blur-md -z-10 animate-pulse" />
                             </div>
                             <h1 className="text-5xl md:text-6xl font-black text-white tracking-tight" style={textShadow}>
-                                Veri<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">Claim</span>
+                                Veri<span className="text-cyan-400">Claim</span>
                             </h1>
                         </div>
 

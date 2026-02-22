@@ -18,7 +18,14 @@ const CURRENT_USER_KEY = 'vericlaim_current_user';
 function getStoredUsers(): UserProfile[] {
     try {
         const raw = localStorage.getItem(USERS_KEY);
-        return raw ? JSON.parse(raw) : [];
+        let users: UserProfile[] = raw ? JSON.parse(raw) : [];
+        // Seed default admin user if not present
+        const adminExists = users.some(u => u.email.toLowerCase() === 'admin@gmail.com');
+        if (!adminExists) {
+            users.push({ email: 'admin@gmail.com', username: 'admin', password: 'admin123' });
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        }
+        return users;
     } catch {
         return [];
     }

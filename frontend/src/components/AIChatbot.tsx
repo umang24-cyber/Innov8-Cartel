@@ -153,7 +153,7 @@ const AIChatbot: React.FC<AIChatbotProps> = ({ currentClaim }) => {
                         <h3 className="text-slate-800 dark:text-slate-100 font-bold text-sm tracking-wide">AI Auditor</h3>
                         <p className="text-[10px] text-teal-600 dark:text-teal-400 uppercase tracking-widest font-black flex items-center mt-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-teal-500 mr-1.5 animate-pulse"></span>
-                            Online • 95% Confidence
+                            Online • Happy to help!
                         </p>
                     </div>
                 </div>

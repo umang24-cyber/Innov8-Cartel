@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, ShieldAlert, Target, Users, TrendingUp, TrendingDown } from 'lucide-react';
+import { Activity, ShieldAlert, FileText, Users, TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import type { DashboardStats, FraudTrend, RiskDistribution } from '../types';
 import { api } from '../services/api';
@@ -14,7 +14,7 @@ const COLORS = {
   Critical: '#ef4444',
 };
 
-export const Overview: React.FC = () => {
+export const Overview: React.FC<{ userEmail?: string }> = ({ userEmail }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [trends, setTrends] = useState<FraudTrend[]>([]);
   const [riskDist, setRiskDist] = useState<RiskDistribution[]>([]);
@@ -58,11 +58,19 @@ export const Overview: React.FC = () => {
       isGood: false,
     },
     {
-      label: 'False Positive Rate',
-      value: `${stats?.falsePositiveRate?.toFixed(1) || 0}%`,
-      trend: stats?.falsePositiveTrend || 0,
-      icon: <Target className="text-cyan-600 dark:text-cyan-400" size={24} />,
-      isGood: stats ? stats.falsePositiveTrend < 0 : true,
+      label: 'Your Pending Claims',
+      value: (() => {
+        if (!userEmail) return '0';
+        try {
+          const raw = localStorage.getItem(`vericlaim_claims_${userEmail}`);
+          const userClaims = raw ? JSON.parse(raw) : [];
+          const pending = userClaims.filter((c: any) => !c.status || c.status === 'Pending').length;
+          return pending.toLocaleString();
+        } catch { return '0'; }
+      })(),
+      trend: 0,
+      icon: <FileText className="text-cyan-600 dark:text-cyan-400" size={24} />,
+      isGood: true,
     },
     {
       label: 'Monthly Fraud Growth',
@@ -106,11 +114,10 @@ export const Overview: React.FC = () => {
                     <TrendingDown className="w-4 h-4 text-rose-600" />
                   )}
                   <span
-                    className={`text-xs font-bold ${
-                      (kpi.isGood && kpi.trend >= 0) || (!kpi.isGood && kpi.trend < 0)
+                    className={`text-xs font-bold ${(kpi.isGood && kpi.trend >= 0) || (!kpi.isGood && kpi.trend < 0)
                         ? 'text-emerald-600'
                         : 'text-rose-600'
-                    }`}
+                      }`}
                   >
                     {Math.abs(kpi.trend).toFixed(1)}%
                   </span>
