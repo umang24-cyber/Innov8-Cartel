@@ -9,8 +9,7 @@ import { TypologyStudio } from './pages/TypologyStudio';
 import { CaseManager } from './pages/CaseManager';
 import { NewClaimPage } from './pages/NewClaimPage';
 import { AyushmanPortal } from './pages/AyushmanPortal';
-import { Prologue } from './components/Prologue';
-import { LoginPage } from './components/LoginPage';
+import { LandingPage } from './components/LandingPage';
 import { ProfileSettings } from './components/ProfileSettings';
 import type { Claim, ViewState } from './types';
 import { api } from './services/api';
@@ -32,15 +31,7 @@ function App() {
     const [error, setError] = useState<string | null>(null);
     const [showNotifications, setShowNotifications] = useState(false);
     const [showProfileSettings, setShowProfileSettings] = useState(false);
-    const [showPrologue, setShowPrologue] = useState(() => {
-        return !sessionStorage.getItem('vericlaim_prologue_seen');
-    });
     const notifRef = useRef<HTMLDivElement>(null);
-
-    const handlePrologueComplete = () => {
-        sessionStorage.setItem('vericlaim_prologue_seen', 'true');
-        setShowPrologue(false);
-    };
 
     // Smooth tab transition handler
     const handleViewChange = (view: ViewState) => {
@@ -172,12 +163,8 @@ function App() {
         setShowProfileSettings(false);
     };
 
-    if (showPrologue) {
-        return <Prologue onComplete={handlePrologueComplete} />;
-    }
-
     if (!isAuthenticated) {
-        return <LoginPage onSignUp={signUp} onLogin={login} />;
+        return <LandingPage onSignUp={signUp} onLogin={login} />;
     }
 
     return (
