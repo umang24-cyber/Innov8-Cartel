@@ -51,6 +51,8 @@ export const api = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     Provider_ID: claim.Provider_ID,
+                    ABHA_ID: claim.ABHA_ID ?? "91-0000-0000-0000",
+                    PMJAY_Package_Code: claim.PMJAY_Package_Code ?? "BM001A",
                     Diagnosis_Code: claim.Diagnosis_Code,
                     Procedure_Code: claim.Procedure_Code,
                     Total_Claim_Amount: claim.Total_Claim_Amount,
@@ -87,6 +89,8 @@ export const api = {
             // Map frontend claim object back to backend dict expectation if present
             const context = claimContext ? {
                 Provider_ID: claimContext.Provider_ID,
+                ABHA_ID: claimContext.ABHA_ID,
+                PMJAY_Package_Code: claimContext.PMJAY_Package_Code,
                 Diagnosis_Code: claimContext.Diagnosis_Code,
                 Procedure_Code: claimContext.Procedure_Code,
                 Total_Claim_Amount: claimContext.Total_Claim_Amount,

@@ -70,7 +70,7 @@ MEGA_LLM_API_KEY = os.getenv("MEGA_LLM_API_KEY", "") # <-- ADDED MEGA LLM KEY
 MODEL_PATH   = "fraud_model.joblib"
 
 # MUST match train_model.py exactly — same column names, same order
-CATEGORICAL_FEATURES = ["Provider_ID", "Diagnosis_Code", "Procedure_Code"]
+CATEGORICAL_FEATURES = ["Provider_ID", "PMJAY_Package_Code", "Diagnosis_Code", "Procedure_Code"]
 NUMERIC_FEATURES     = ["Total_Claim_Amount"]
 ALL_FEATURES         = CATEGORICAL_FEATURES + NUMERIC_FEATURES
 
@@ -240,11 +240,13 @@ class ClaimRequest(BaseModel):
     Pydantic automatically validates types and raises 422 if anything is wrong.
     The Field(...) with example values powers the /docs UI auto-demo.
     """
-    Provider_ID:        str   = Field(..., example="PRV-0007")
-    Diagnosis_Code:     str   = Field(..., example="J06.9")
-    Procedure_Code:     str   = Field(..., example="99214")
-    Total_Claim_Amount: float = Field(..., gt=0, example=9500.00)
-    Unstructured_Notes: str   = Field(..., example="Patient had mild sore throat. Prescribed lozenges.")
+    Provider_ID:         str   = Field(..., example="PRV-0007")
+    ABHA_ID:             str   = Field(..., example="91-4567-8912-3456")
+    PMJAY_Package_Code:  str   = Field(..., example="BM001A")
+    Diagnosis_Code:      str   = Field(..., example="J06.9")
+    Procedure_Code:      str   = Field(..., example="99214")
+    Total_Claim_Amount:  float = Field(..., gt=0, example=9500.00)
+    Unstructured_Notes:  str   = Field(..., example="Patient had mild sore throat. Prescribed lozenges.")
 
 
 class SHAPDetail(BaseModel):
@@ -381,12 +383,14 @@ def build_shap_outputs(
         # "cat__Provider_ID_PRV-0007" → "Provider: PRV-0007"
         if "Provider_ID_" in fname:
             display = f"Provider: {fname.split('Provider_ID_')[-1]}"
+        elif "PMJAY_Package_Code_" in fname:
+            display = f"Package: {fname.split('PMJAY_Package_Code_')[-1]}"
         elif "Diagnosis_Code_" in fname:
             display = f"Diagnosis: {fname.split('Diagnosis_Code_')[-1]}"
         elif "Procedure_Code_" in fname:
             display = f"Procedure: {fname.split('Procedure_Code_')[-1]}"
         elif fname == "Total_Claim_Amount":
-            display = f"Claim Amount: ${claim.Total_Claim_Amount:,.0f}"
+            display = f"Claim Amount: ₹{claim.Total_Claim_Amount:,.0f}"
         else:
             display = fname
 
@@ -407,10 +411,10 @@ def build_shap_outputs(
         stats   = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
         z_score = (claim.Total_Claim_Amount - stats["mean"]) / stats["std"]
         explanation = (
-            f"Primary driver: Claim amount ${claim.Total_Claim_Amount:,.2f} is "
+            f"Primary driver: Claim amount ₹{claim.Total_Claim_Amount:,.2f} is "
             f"{abs(z_score):.1f} standard deviations "
             f"{'above' if z_score > 0 else 'below'} the expected "
-            f"${stats['mean']:,.0f} mean for diagnosis {claim.Diagnosis_Code}. "
+            f"₹{stats['mean']:,.0f} mean for diagnosis {claim.Diagnosis_Code}. "
             f"This {direction} the fraud risk score (SHAP: {top_val:+.4f})."
         )
     elif "Provider_ID_" in top_feature:
@@ -538,6 +542,7 @@ async def analyze_claim(claim: ClaimRequest):
     # Column names and dtypes must be identical to what train_model.py used.
     input_df = pd.DataFrame([{
         "Provider_ID":        claim.Provider_ID,
+        "PMJAY_Package_Code": claim.PMJAY_Package_Code,
         "Diagnosis_Code":     claim.Diagnosis_Code,
         "Procedure_Code":     claim.Procedure_Code,
         "Total_Claim_Amount": claim.Total_Claim_Amount,
@@ -986,14 +991,14 @@ async def demo_claims(
     Returns sample claims + locally saved claims, now supporting search and filtering from the UI.
     """
     claims = [
-        {"claim_id": "CLM-8492", "Provider_ID": "PRV-0007", "Diagnosis_Code": "J06.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 15000, "Unstructured_Notes": "Mild sore throat, prescribed lozenges."},
-        {"claim_id": "CLM-8491", "Provider_ID": "PRV-0013", "Diagnosis_Code": "M54.5",  "Procedure_Code": "99213", "Total_Claim_Amount": 8900,  "Unstructured_Notes": "Patient reports chronic lower back pain. Prescribed NSAIDs."},
-        {"claim_id": "CLM-8490", "Provider_ID": "PRV-0001", "Diagnosis_Code": "E11.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 580,   "Unstructured_Notes": "Routine diabetes management visit. A1C reviewed. Metformin refilled."},
-        {"claim_id": "CLM-8489", "Provider_ID": "PRV-0031", "Diagnosis_Code": "Z00.00", "Procedure_Code": "99213", "Total_Claim_Amount": 12000, "Unstructured_Notes": "Annual physical. No complaints."},
-        {"claim_id": "CLM-8488", "Provider_ID": "PRV-0002", "Diagnosis_Code": "I10",    "Procedure_Code": "93000", "Total_Claim_Amount": 490,   "Unstructured_Notes": "BP 145/92. Adjusted lisinopril dosage. ECG normal."},
-        {"claim_id": "CLM-8487", "Provider_ID": "PRV-0007", "Diagnosis_Code": "N39.0",  "Procedure_Code": "81003", "Total_Claim_Amount": 5500,  "Unstructured_Notes": "UTI confirmed by urinalysis. Prescribed trimethoprim."},
-        {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "Diagnosis_Code": "F32.1",  "Procedure_Code": "90837", "Total_Claim_Amount": 420,   "Unstructured_Notes": "60-minute psychotherapy session. Patient reporting improved mood."},
-        {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 260,   "Unstructured_Notes": "Endoscopy showed mild esophageal irritation. Prescribed PPI."},
+        {"claim_id": "CLM-8492", "Provider_ID": "PRV-0007", "ABHA_ID": "91-4567-8912-3456", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "J06.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 15000, "Unstructured_Notes": "Mild sore throat, prescribed lozenges."},
+        {"claim_id": "CLM-8491", "Provider_ID": "PRV-0013", "ABHA_ID": "91-2234-5678-9012", "PMJAY_Package_Code": "BM002B", "Diagnosis_Code": "M54.5",  "Procedure_Code": "99213", "Total_Claim_Amount": 8900,  "Unstructured_Notes": "Patient reports chronic lower back pain. Prescribed NSAIDs."},
+        {"claim_id": "CLM-8490", "Provider_ID": "PRV-0001", "ABHA_ID": "91-3456-7890-1234", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "E11.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 580,   "Unstructured_Notes": "Routine diabetes management visit. A1C reviewed. Metformin refilled."},
+        {"claim_id": "CLM-8489", "Provider_ID": "PRV-0031", "ABHA_ID": "91-5678-9012-3456", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "Z00.00", "Procedure_Code": "99213", "Total_Claim_Amount": 12000, "Unstructured_Notes": "Annual physical. No complaints."},
+        {"claim_id": "CLM-8488", "Provider_ID": "PRV-0002", "ABHA_ID": "91-6789-0123-4567", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "I10",    "Procedure_Code": "93000", "Total_Claim_Amount": 490,   "Unstructured_Notes": "BP 145/92. Adjusted lisinopril dosage. ECG normal."},
+        {"claim_id": "CLM-8487", "Provider_ID": "PRV-0007", "ABHA_ID": "91-7890-1234-5678", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "N39.0",  "Procedure_Code": "81003", "Total_Claim_Amount": 5500,  "Unstructured_Notes": "UTI confirmed by urinalysis. Prescribed trimethoprim."},
+        {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "ABHA_ID": "91-8901-2345-6789", "PMJAY_Package_Code": "BM002B", "Diagnosis_Code": "F32.1",  "Procedure_Code": "90837", "Total_Claim_Amount": 420,   "Unstructured_Notes": "60-minute psychotherapy session. Patient reporting improved mood."},
+        {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "ABHA_ID": "91-9012-3456-7890", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 260,   "Unstructured_Notes": "Endoscopy showed mild esophageal irritation. Prescribed PPI."},
     ]
     
     # Append the globally stored dynamic claims

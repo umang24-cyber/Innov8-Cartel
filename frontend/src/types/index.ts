@@ -3,6 +3,8 @@ export type RiskLevel = 'Low' | 'Medium' | 'High' | 'Critical';
 export interface Claim {
   claim_id: string;
   Provider_ID: string;
+  ABHA_ID?: string;
+  PMJAY_Package_Code?: string;
   Diagnosis_Code: string;
   Procedure_Code: string;
   Total_Claim_Amount: number;

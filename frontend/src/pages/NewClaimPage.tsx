@@ -7,6 +7,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 export const NewClaimPage: React.FC = () => {
     const [formData, setFormData] = useState({
         Provider_ID: '',
+        ABHA_ID: '91-4567-8912-3456',
+        PMJAY_Package_Code: 'BM001A',
         Diagnosis_Code: '',
         Procedure_Code: '',
         Total_Claim_Amount: '',
@@ -50,7 +52,7 @@ export const NewClaimPage: React.FC = () => {
         setResult(null);
         setSaveSuccess(false);
 
-        if (!formData.Provider_ID || !formData.Diagnosis_Code || !formData.Procedure_Code || !formData.Total_Claim_Amount) {
+        if (!formData.Provider_ID || !formData.ABHA_ID || !formData.PMJAY_Package_Code || !formData.Diagnosis_Code || !formData.Procedure_Code || !formData.Total_Claim_Amount) {
             setError('Please fill in all required fields.');
             return;
         }
@@ -60,6 +62,8 @@ export const NewClaimPage: React.FC = () => {
             const claimPayload: Claim = {
                 claim_id: `MAN-${Date.now().toString(36).toUpperCase()}`,
                 Provider_ID: formData.Provider_ID,
+                ABHA_ID: formData.ABHA_ID,
+                PMJAY_Package_Code: formData.PMJAY_Package_Code,
                 Diagnosis_Code: formData.Diagnosis_Code,
                 Procedure_Code: formData.Procedure_Code,
                 Total_Claim_Amount: parseFloat(formData.Total_Claim_Amount),
@@ -77,7 +81,7 @@ export const NewClaimPage: React.FC = () => {
     };
 
     const handleReset = () => {
-        setFormData({ Provider_ID: '', Diagnosis_Code: '', Procedure_Code: '', Total_Claim_Amount: '', Unstructured_Notes: '' });
+        setFormData({ Provider_ID: '', ABHA_ID: '91-4567-8912-3456', PMJAY_Package_Code: 'BM001A', Diagnosis_Code: '', Procedure_Code: '', Total_Claim_Amount: '', Unstructured_Notes: '' });
         setResult(null);
         setError(null);
         setSaveSuccess(false);
@@ -92,6 +96,8 @@ export const NewClaimPage: React.FC = () => {
         try {
             const claimData = {
                 Provider_ID: formData.Provider_ID,
+                ABHA_ID: formData.ABHA_ID,
+                PMJAY_Package_Code: formData.PMJAY_Package_Code,
                 Diagnosis_Code: formData.Diagnosis_Code,
                 Procedure_Code: formData.Procedure_Code,
                 Total_Claim_Amount: parseFloat(formData.Total_Claim_Amount),
@@ -145,6 +151,30 @@ export const NewClaimPage: React.FC = () => {
                             />
                         </div>
 
+                        {/* ABHA ID */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">ABHA ID *</label>
+                            <input
+                                type="text"
+                                value={formData.ABHA_ID}
+                                onChange={(e) => setFormData({ ...formData, ABHA_ID: e.target.value })}
+                                placeholder="91-XXXX-XXXX-XXXX"
+                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all hover:border-teal-300 dark:hover:border-teal-600"
+                            />
+                        </div>
+
+                        {/* PM-JAY Package Code */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">PM-JAY Package Code *</label>
+                            <input
+                                type="text"
+                                value={formData.PMJAY_Package_Code}
+                                onChange={(e) => setFormData({ ...formData, PMJAY_Package_Code: e.target.value })}
+                                placeholder="e.g. BM001A, MC012A"
+                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all hover:border-teal-300 dark:hover:border-teal-600"
+                            />
+                        </div>
+
                         {/* Diagnosis Code */}
                         <div>
                             <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">Diagnosis Code *</label>
@@ -177,7 +207,7 @@ export const NewClaimPage: React.FC = () => {
 
                         {/* Total Claim Amount */}
                         <div>
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">Total Claim Amount ($) *</label>
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">Total Claim Amount (₹) *</label>
                             <input
                                 type="number"
                                 step="0.01"

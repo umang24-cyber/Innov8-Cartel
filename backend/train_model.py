@@ -1,5 +1,5 @@
 """
-train_model.py — ML Training Pipeline (Balanced + Stable Version)
+train_model.py — ML Training Pipeline (PM-JAY Fraud Detection)
 """
 
 import joblib
@@ -20,9 +20,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 
 # ── Config ──────────────────────────────────────────────────────────────
-CSV_PATH   = "synthetic_claims.csv"
+CSV_PATH = "synthetic_claims.csv"
 MODEL_PATH = "fraud_model.joblib"
-SEED       = 42
+SEED = 42
+
+# ── Features (ABHA_ID excluded to prevent overfitting) ───────────────────
+CATEGORICAL_FEATURES = ["Provider_ID", "PMJAY_Package_Code", "Diagnosis_Code", "Procedure_Code"]
+NUMERIC_FEATURES = ["Total_Claim_Amount"]
+ALL_FEATURES = CATEGORICAL_FEATURES + NUMERIC_FEATURES
 
 # ════════════════════════════════════════════════════════════════════════
 # 1. Load data
@@ -31,20 +36,16 @@ print("📂 Loading data …")
 df = pd.read_csv(CSV_PATH)
 print(f"Shape: {df.shape} | Fraud rate: {df['Is_Fraud'].mean()*100:.1f}%")
 
-CATEGORICAL_FEATURES = ["Provider_ID", "Diagnosis_Code", "Procedure_Code"]
-NUMERIC_FEATURES     = ["Total_Claim_Amount"]
-ALL_FEATURES         = CATEGORICAL_FEATURES + NUMERIC_FEATURES
-
-X = df[ALL_FEATURES]
+X = df[ALL_FEATURES]  # ABHA_ID dropped
 y = df["Is_Fraud"]
 
 # ════════════════════════════════════════════════════════════════════════
-# 2. Train/Test Split (Stratified)
+# 2. Train/Test Split (Stratified, 93% train / 7% test)
 # ════════════════════════════════════════════════════════════════════════
 X_train, X_test, y_train, y_test = train_test_split(
     X,
     y,
-    test_size=0.20,
+    test_size=0.07,
     random_state=SEED,
     stratify=y,
 )
@@ -68,7 +69,6 @@ preprocessor = ColumnTransformer(
 
 # ════════════════════════════════════════════════════════════════════════
 # 4. Pipeline (SMOTE + RandomForest)
-# NOTE: Removed class_weight because SMOTE already balances
 # ════════════════════════════════════════════════════════════════════════
 pipeline = ImbPipeline(steps=[
     ("preprocessor", preprocessor),
@@ -105,19 +105,16 @@ print(classification_report(y_test, y_pred, target_names=["Legit", "Fraud"]))
 roc = roc_auc_score(y_test, y_prob)
 print(f"\nROC-AUC: {roc:.4f}")
 
-# ── Confusion Matrix ───────────────────────────────────────────────────
 tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
-
 print("\nConfusion Matrix:")
 print(f"TN: {tn}  FP: {fp}")
 print(f"FN: {fn}  TP: {tp}")
 
-# Proper False Positive Rate calculation
 fpr = fp / (fp + tn)
-print(f"\nFalse Positive Rate (correct): {fpr:.4f}")
+print(f"\nFalse Positive Rate: {fpr:.4f}")
 
 # ════════════════════════════════════════════════════════════════════════
-# 7. Threshold Tuning (Optional but Recommended)
+# 7. Threshold Testing
 # ════════════════════════════════════════════════════════════════════════
 print("\n🎯 Threshold Testing:")
 for t in [0.5, 0.6, 0.7, 0.8]:
@@ -133,12 +130,9 @@ for t in [0.5, 0.6, 0.7, 0.8]:
 # ════════════════════════════════════════════════════════════════════════
 rf = pipeline.named_steps["classifier"]
 ohe = pipeline.named_steps["preprocessor"].named_transformers_["cat"]
-
 ohe_names = ohe.get_feature_names_out(CATEGORICAL_FEATURES).tolist()
 feature_names = ohe_names + NUMERIC_FEATURES
-
 importances = pd.Series(rf.feature_importances_, index=feature_names)
-
 print("\n🔍 Top 10 Important Features:")
 print(importances.sort_values(ascending=False).head(10))
 

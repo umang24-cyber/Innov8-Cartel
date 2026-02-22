@@ -1,14 +1,8 @@
 """
-prep_data.py — Synthetic Healthcare Claims Data Generator
-==========================================================
-Generates 5,000 synthetic healthcare claims with a realistic ~5% fraud rate.
-Key design principle: fraud claims have LOGICALLY higher amounts for their
-specific diagnosis code, making the ML signal meaningful, not random noise.
-
-Run:
-    python prep_data.py
-Output:
-    synthetic_claims.csv
+prep_data.py — PM-JAY Synthetic Claims Data Generator
+=====================================================
+Generates 5,000 rows of Ayushman Bharat PM-JAY synthetic claims.
+93% Legitimate / 7% Fraud. All amounts in Indian Rupees (₹).
 """
 
 import numpy as np
@@ -16,134 +10,145 @@ import pandas as pd
 
 # ── Reproducibility ────────────────────────────────────────────────────────────
 SEED = 42
-rng  = np.random.default_rng(SEED)
+rng = np.random.default_rng(SEED)
 
 # ── Dataset size & fraud rate ──────────────────────────────────────────────────
-N_CLAIMS    = 5_000
-FRAUD_RATE  = 0.05          # 5 % → ~250 fraud rows
-N_FRAUD     = int(N_CLAIMS * FRAUD_RATE)
-N_LEGIT     = N_CLAIMS - N_FRAUD
+N_CLAIMS = 5_000
+FRAUD_RATE = 0.07  # 7% fraud → 350 fraud rows
+N_FRAUD = int(N_CLAIMS * FRAUD_RATE)
+N_LEGIT = N_CLAIMS - N_FRAUD
 
-# ── Realistic provider pool ────────────────────────────────────────────────────
-# Mix of large (high-volume) and small (low-volume) providers.
-# A handful of "bad actors" are seeded into fraudulent claims later.
-PROVIDERS = [f"PRV-{str(i).zfill(4)}" for i in range(1, 51)]   # 50 providers
-FRAUD_PROVIDERS = ["PRV-0007", "PRV-0013", "PRV-0031"]          # 3 bad actors
-
-# ── Diagnosis codes and their NORMAL claim-amount distributions ────────────────
-# Format: { ICD_code: (mean_usd, std_usd) }
-# These represent typical reimbursement ranges per diagnosis.
-DIAG_DISTRIBUTIONS = {
-    "J06.9":  (150,   40),    # Upper respiratory infection — cheap
-    "M54.5":  (320,   80),    # Low back pain
-    "E11.9":  (600,  150),    # Type 2 diabetes management
-    "I10":    (500,  120),    # Essential hypertension
-    "K21.0":  (280,   70),    # GERD with oesophagitis
-    "Z00.00": (200,   50),    # Routine general exam
-    "S72.001":(8_500, 900),   # Femur fracture — legitimately expensive
-    "C34.10": (12_000,2_000), # Lung cancer — legitimately expensive
-    "F32.1":  (400,  100),    # Major depressive disorder
-    "N39.0":  (180,   45),    # UTI
+# ── PM-JAY Package Codes and Rupee ranges ──────────────────────────────────────
+# Format: (min_inr, max_inr) for legitimate claims
+PMJAY_PACKAGES = {
+    "BM001A": (1_500, 3_000),    # Gen Med
+    "BM002B": (2_000, 4_000),    # Gen Med extended
+    "MC012A": (10_000, 15_000),  # Delivery (normal)
+    "MC013B": (15_000, 22_000),  # Caesarean
+    "SG001B": (20_000, 25_000),  # Appendectomy
+    "SG002C": (25_000, 35_000),  # Cholecystectomy
+    "CV045C": (120_000, 150_000),  # CABG
+    "CV046D": (80_000, 100_000),  # Valve repair
+    "OR001A": (8_000, 12_000),   # Ortho minor
+    "OR002B": (35_000, 45_000),  # Hip/Knee replacement
 }
-DIAG_CODES = list(DIAG_DISTRIBUTIONS.keys())
+PACKAGE_CODES = list(PMJAY_PACKAGES.keys())
 
-# ── Procedure codes (CPT-style) ────────────────────────────────────────────────
-PROC_CODES = [
-    "99213",  # Office visit, established patient, low complexity
-    "99214",  # Office visit, established patient, moderate complexity
-    "99232",  # Subsequent hospital care
-    "27447",  # Total knee arthroplasty
-    "43239",  # Upper GI endoscopy with biopsy
-    "71046",  # Chest X-ray, 2 views
-    "93000",  # ECG with interpretation
-    "96413",  # Chemotherapy administration
-    "90837",  # Psychotherapy, 60 min
-    "81003",  # Urinalysis, automated
-]
+# Diagnosis codes (ICD-10) mapped to typical packages
+DIAG_TO_PACKAGE = {
+    "J06.9": ["BM001A"],           # Acute URI
+    "M54.5": ["BM001A", "BM002B"], # Low back pain
+    "E11.9": ["BM001A", "BM002B"], # Type 2 diabetes
+    "I10": ["BM001A"],             # Hypertension
+    "K21.0": ["BM001A"],           # GERD
+    "Z00.00": ["BM001A"],          # Routine exam
+    "O80": ["MC012A"],             # Normal delivery
+    "O82": ["MC013B"],             # Caesarean
+    "K35.80": ["SG001B"],          # Appendicitis
+    "K80.20": ["SG002C"],          # Gallstones
+    "I25.10": ["CV045C"],          # CAD
+    "I35.0": ["CV046D"],          # Aortic stenosis
+    "S72.001": ["OR001A", "OR002B"],  # Femur fracture
+    "M17.11": ["OR002B"],         # Knee OA
+    "N39.0": ["BM001A"],          # UTI
+}
+DIAG_CODES = list(DIAG_TO_PACKAGE.keys())
 
+# Procedure codes
+PROC_CODES = ["99213", "99214", "99232", "27447", "43239", "71046", "93000", "96413", "90837", "81003"]
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Helper: draw a claim amount for a given diagnosis
-# ══════════════════════════════════════════════════════════════════════════════
-def sample_legit_amount(diag_code: str) -> float:
-    """Return a realistic (non-fraud) claim amount for this diagnosis."""
-    mean, std = DIAG_DISTRIBUTIONS[diag_code]
-    # Use a log-normal draw so amounts are always positive and right-skewed
-    # (claim amounts in the real world follow this distribution).
-    mu    = np.log(mean)
-    sigma = std / mean          # approximate log-normal σ from normal σ
-    amount = rng.lognormal(mu, sigma)
-    return round(float(np.clip(amount, mean * 0.3, mean * 3.0)), 2)
-
-
-def sample_fraud_amount(diag_code: str) -> float:
-    """
-    Return an anomalously HIGH claim amount for this diagnosis.
-    Fraud pattern: bill 3–8× the typical mean for the code.
-    This creates a strong, learnable signal for the Random Forest.
-    """
-    mean, std = DIAG_DISTRIBUTIONS[diag_code]
-    multiplier = rng.uniform(3.0, 8.0)
-    amount = mean * multiplier + rng.normal(0, std * 0.5)
-    return round(float(max(amount, mean * 2.5)), 2)
+# Provider pool
+PROVIDERS = [f"PRV-{str(i).zfill(4)}" for i in range(1, 51)]
+FRAUD_PROVIDERS = ["PRV-0007", "PRV-0013", "PRV-0031"]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Build LEGITIMATE claims
-# ══════════════════════════════════════════════════════════════════════════════
-legit_diag  = rng.choice(DIAG_CODES,  size=N_LEGIT)
-legit_proc  = rng.choice(PROC_CODES,  size=N_LEGIT)
-legit_prov  = rng.choice(PROVIDERS,   size=N_LEGIT)
-legit_amounts = np.array([sample_legit_amount(d) for d in legit_diag])
+def generate_abha_id() -> str:
+    """Generate a fake 14-digit ABHA ID in format 91-XXXX-XXXX-XXXX."""
+    part1 = rng.integers(1000, 9999)
+    part2 = rng.integers(1000, 9999)
+    part3 = rng.integers(1000, 9999)
+    return f"91-{part1}-{part2}-{part3}"
 
-df_legit = pd.DataFrame({
-    "Provider_ID":        legit_prov,
-    "Diagnosis_Code":     legit_diag,
-    "Procedure_Code":     legit_proc,
-    "Total_Claim_Amount": legit_amounts,
-    "Is_Fraud":           0,
-})
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Build FRAUD claims
-# ══════════════════════════════════════════════════════════════════════════════
-# Fraud providers appear more often in the fraud set (but not exclusively —
-# some fraudulent claims come from otherwise clean providers to avoid naive
-# "just block the provider" detection).
-fraud_prov_weights = np.where(
-    np.isin(PROVIDERS, FRAUD_PROVIDERS), 10.0, 1.0   # bad actors 10× more likely
+def sample_legit_claim() -> dict:
+    """Generate one legitimate claim with amount within package range."""
+    diag = rng.choice(DIAG_CODES)
+    package = rng.choice(DIAG_TO_PACKAGE[diag])
+    min_r, max_r = PMJAY_PACKAGES[package]
+    amount = round(float(rng.uniform(min_r, max_r)), 2)
+    return {
+        "Provider_ID": rng.choice(PROVIDERS),
+        "ABHA_ID": generate_abha_id(),
+        "PMJAY_Package_Code": package,
+        "Diagnosis_Code": diag,
+        "Procedure_Code": rng.choice(PROC_CODES),
+        "Total_Claim_Amount": amount,
+        "Is_Fraud": 0,
+    }
+
+
+def sample_wallet_depletion_fraud() -> dict:
+    """Fraud pattern 1: Wallet Depletion — spike amounts ₹4,50,000–₹4,99,000."""
+    amount = round(float(rng.uniform(450_000, 499_000)), 2)
+    diag = rng.choice(DIAG_CODES)
+    package = rng.choice(DIAG_TO_PACKAGE[diag])
+    return {
+        "Provider_ID": rng.choice(PROVIDERS, p=_fraud_provider_weights()),
+        "ABHA_ID": generate_abha_id(),
+        "PMJAY_Package_Code": package,
+        "Diagnosis_Code": diag,
+        "Procedure_Code": rng.choice(PROC_CODES),
+        "Total_Claim_Amount": amount,
+        "Is_Fraud": 1,
+    }
+
+
+def sample_upcoding_fraud() -> dict:
+    """Fraud pattern 2: Upcoding — cheap BM001A but bill > ₹50,000."""
+    amount = round(float(rng.uniform(50_001, 120_000)), 2)
+    return {
+        "Provider_ID": rng.choice(PROVIDERS, p=_fraud_provider_weights()),
+        "ABHA_ID": generate_abha_id(),
+        "PMJAY_Package_Code": "BM001A",
+        "Diagnosis_Code": rng.choice(["J06.9", "M54.5", "Z00.00", "N39.0"]),
+        "Procedure_Code": rng.choice(PROC_CODES),
+        "Total_Claim_Amount": amount,
+        "Is_Fraud": 1,
+    }
+
+
+def _fraud_provider_weights() -> np.ndarray:
+    """Bad actors more likely in fraud set."""
+    w = np.array([10.0 if p in FRAUD_PROVIDERS else 1.0 for p in PROVIDERS])
+    return w / w.sum()
+
+
+# ── Build LEGITIMATE claims ────────────────────────────────────────────────────
+legit_rows = [sample_legit_claim() for _ in range(N_LEGIT)]
+df_legit = pd.DataFrame(legit_rows)
+
+# ── Build FRAUD claims (50% Wallet Depletion, 50% Upcoding) ────────────────────
+n_wallet = N_FRAUD // 2
+n_upcode = N_FRAUD - n_wallet
+fraud_rows = (
+    [sample_wallet_depletion_fraud() for _ in range(n_wallet)] +
+    [sample_upcoding_fraud() for _ in range(n_upcode)]
 )
-fraud_prov_weights = fraud_prov_weights / fraud_prov_weights.sum()
+df_fraud = pd.DataFrame(fraud_rows)
 
-fraud_diag   = rng.choice(DIAG_CODES, size=N_FRAUD)
-fraud_proc   = rng.choice(PROC_CODES, size=N_FRAUD)
-fraud_prov   = rng.choice(PROVIDERS,  size=N_FRAUD, p=fraud_prov_weights)
-fraud_amounts = np.array([sample_fraud_amount(d) for d in fraud_diag])
-
-df_fraud = pd.DataFrame({
-    "Provider_ID":        fraud_prov,
-    "Diagnosis_Code":     fraud_diag,
-    "Procedure_Code":     fraud_proc,
-    "Total_Claim_Amount": fraud_amounts,
-    "Is_Fraud":           1,
-})
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Combine, shuffle, save
-# ══════════════════════════════════════════════════════════════════════════════
+# ── Combine, shuffle, save ─────────────────────────────────────────────────────
 df = (
     pd.concat([df_legit, df_fraud], ignore_index=True)
-    .sample(frac=1, random_state=SEED)   # shuffle rows
+    .sample(frac=1, random_state=SEED)
     .reset_index(drop=True)
 )
 
-# Sanity checks
 assert len(df) == N_CLAIMS, "Row count mismatch"
 fraud_pct = df["Is_Fraud"].mean() * 100
-print(f"✅  Dataset shape   : {df.shape}")
-print(f"✅  Fraud rate      : {fraud_pct:.1f}%")
-print(f"✅  Avg legit $     : ${df.loc[df.Is_Fraud==0,'Total_Claim_Amount'].mean():,.2f}")
-print(f"✅  Avg fraud $     : ${df.loc[df.Is_Fraud==1,'Total_Claim_Amount'].mean():,.2f}")
+print(f"✅  Dataset shape     : {df.shape}")
+print(f"✅  Fraud rate        : {fraud_pct:.1f}%")
+print(f"✅  Avg legit ₹       : ₹{df.loc[df.Is_Fraud == 0, 'Total_Claim_Amount'].mean():,.2f}")
+print(f"✅  Avg fraud ₹       : ₹{df.loc[df.Is_Fraud == 1, 'Total_Claim_Amount'].mean():,.2f}")
 print(df.head())
 
 df.to_csv("synthetic_claims.csv", index=False)
