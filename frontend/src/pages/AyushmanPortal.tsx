@@ -60,7 +60,7 @@ export const AyushmanPortal: React.FC = () => {
     };
 
     return (
-        <div className="min-h-full flex flex-col">
+        <div className="h-full overflow-y-auto flex flex-col pb-8">
             {/* Header - Govt portal style */}
             <div className="mb-6 pb-6 border-b-2 border-slate-200 dark:border-slate-700">
                 <div className="flex items-center gap-3 mb-2">
@@ -182,11 +182,10 @@ export const AyushmanPortal: React.FC = () => {
                             <AyushmanBadge isVerified={result.bis_verified} abhaId={formData.ABHA_ID} />
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Risk Score:</span>
-                                <span className={`px-3 py-1 rounded-lg font-bold text-lg ${
-                                    result.risk_score >= 60 ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' :
-                                    result.risk_score >= 30 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
-                                    'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                                }`}>
+                                <span className={`px-3 py-1 rounded-lg font-bold text-lg ${result.risk_score >= 60 ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' :
+                                        result.risk_score >= 30 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
+                                            'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                    }`}>
                                     {result.risk_score}/100
                                 </span>
                             </div>
