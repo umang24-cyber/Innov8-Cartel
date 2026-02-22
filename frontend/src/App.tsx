@@ -111,8 +111,8 @@ function App() {
                         llmAnalysis: result.llm_text_analysis,
                         diagnosisStats: result.diagnosis_stats,
                         anomalyScore: result.anomaly_score,
-                        benfordScore: result.benford_score,
-                        benfordAnalysis: result.benford_analysis,
+                        gaussianScore: result.gaussian_score,
+                        gaussianAnalysis: result.gaussian_analysis,
                         status: 'Investigated'
                     }
                     : c
@@ -138,8 +138,8 @@ function App() {
                     llmAnalysis: undefined,
                     diagnosisStats: undefined,
                     anomalyScore: undefined,
-                    benfordScore: undefined,
-                    benfordAnalysis: undefined,
+                    gaussianScore: undefined,
+                    gaussianAnalysis: undefined,
                     status: 'Cleared'
                 }
                 : c

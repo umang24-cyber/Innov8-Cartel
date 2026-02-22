@@ -155,30 +155,30 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                     </section>
                 )}
 
-                {/* Benford's Law Analysis */}
-                {hasBeenAnalyzed && claim.benfordScore !== undefined && claim.benfordAnalysis && (
+                {/* Gaussian Distribution Analysis */}
+                {hasBeenAnalyzed && claim.gaussianScore !== undefined && claim.gaussianAnalysis && (
                     <section className="transition-all duration-500 animate-in fade-in slide-in-from-bottom-4">
                         <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-3 flex items-center">
                             <TrendingUp className="mr-2 text-purple-500" size={14} />
-                            Benford's Law Analysis
+                            Gaussian Distribution
                         </h3>
-                        <div className={`p-4 rounded-xl border shadow-sm ${claim.benfordScore > 50
+                        <div className={`p-4 rounded-xl border shadow-sm ${claim.gaussianScore > 50
                             ? 'bg-purple-50/80 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
                             : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'
                             }`}>
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider font-bold">Deviation Score</span>
-                                <span className={`text-sm font-extrabold ${claim.benfordScore > 50 ? 'text-purple-700 dark:text-purple-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                    {claim.benfordScore.toFixed(1)}/100
+                                <span className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider font-bold">Z-Score Suspicion</span>
+                                <span className={`text-sm font-extrabold ${claim.gaussianScore > 50 ? 'text-purple-700 dark:text-purple-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                    {claim.gaussianScore.toFixed(1)}/100
                                 </span>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mb-3">
                                 <div
-                                    className={`h-2 rounded-full transition-all duration-700 ${claim.benfordScore > 50 ? 'bg-purple-500' : 'bg-teal-500'}`}
-                                    style={{ width: `${Math.min(claim.benfordScore, 100)}%` }}
+                                    className={`h-2 rounded-full transition-all duration-700 ${claim.gaussianScore > 50 ? 'bg-purple-500' : 'bg-teal-500'}`}
+                                    style={{ width: `${Math.min(claim.gaussianScore, 100)}%` }}
                                 ></div>
                             </div>
-                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">{claim.benfordAnalysis}</p>
+                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">{claim.gaussianAnalysis}</p>
                         </div>
                     </section>
                 )}

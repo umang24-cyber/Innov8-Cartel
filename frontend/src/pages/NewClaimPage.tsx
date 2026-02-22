@@ -487,7 +487,7 @@ export const NewClaimPage: React.FC<NewClaimPageProps> = ({ userEmail, onClaimSa
                                         </div>
                                     )}
 
-                                    {/* Anomaly + Benford */}
+                                    {/* Anomaly + Gaussian */}
                                     <div className="grid grid-cols-2 gap-4">
                                         {result.anomaly_score !== undefined && (
                                             <div className={`p-4 rounded-xl border shadow-sm ${result.anomaly_score === -1 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' : 'bg-teal-50 dark:bg-teal-900/20 border-teal-200 dark:border-teal-800'}`}>
@@ -497,11 +497,11 @@ export const NewClaimPage: React.FC<NewClaimPageProps> = ({ userEmail, onClaimSa
                                                 </p>
                                             </div>
                                         )}
-                                        {result.benford_score !== undefined && (
-                                            <div className={`p-4 rounded-xl border shadow-sm ${result.benford_score > 50 ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
-                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1"><TrendingUp size={12} /> Benford's Law</p>
-                                                <p className={`text-sm font-bold ${result.benford_score > 50 ? 'text-purple-700 dark:text-purple-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                                                    Deviation: {result.benford_score?.toFixed(1)}/100
+                                        {result.gaussian_score !== undefined && (
+                                            <div className={`p-4 rounded-xl border shadow-sm ${result.gaussian_score > 50 ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'}`}>
+                                                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1"><TrendingUp size={12} /> Gaussian Distribution</p>
+                                                <p className={`text-sm font-bold ${result.gaussian_score > 50 ? 'text-purple-700 dark:text-purple-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                    Z-Score: {result.gaussian_score?.toFixed(1)}/100
                                                 </p>
                                             </div>
                                         )}

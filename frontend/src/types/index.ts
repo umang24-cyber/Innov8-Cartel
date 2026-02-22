@@ -23,10 +23,10 @@ export interface Claim {
   };
   status?: 'Pending' | 'Investigating' | 'Investigated' | 'Done' | 'Cleared' | 'Rejected';
 
-  // New features: Anomaly Detection & Benford's Law
+  // New features: Anomaly Detection & Gaussian Distribution
   anomalyScore?: number;
-  benfordScore?: number;
-  benfordAnalysis?: string;
+  gaussianScore?: number;
+  gaussianAnalysis?: string;
 }
 
 export interface Case {

@@ -267,8 +267,8 @@ class ClaimResponse(BaseModel):
       llm_text_analysis → Groq's auditor finding
       advisory_note     → always-present disclaimer banner
       anomaly_score     → Isolation Forest anomaly detection (-1 = anomaly, 1 = normal)
-      benford_score     → Benford's Law deviation score (0-100, higher = more suspicious)
-      benford_analysis   → Human-readable Benford's Law explanation
+      gaussian_score    → Gaussian z-score suspicion score (0-100, higher = more suspicious)
+      gaussian_analysis → Human-readable Gaussian distribution explanation
     """
     risk_score:         int          # 0–100
     risk_label:         str          # "HIGH" | "MEDIUM" | "LOW"
@@ -278,77 +278,71 @@ class ClaimResponse(BaseModel):
     diagnosis_stats:    dict         # mean/std for the diagnosed code (for UI display)
     advisory_note:      str          # mandatory disclaimer
     anomaly_score:      int          # -1 = anomaly detected, 1 = normal
-    benford_score:      float        # 0-100, higher = more deviation from Benford's Law
-    benford_analysis:   str          # Human-readable explanation
+    gaussian_score:     float        # 0-100, higher = more suspicious (z-score based)
+    gaussian_analysis:  str          # Human-readable Gaussian explanation
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Helper: Benford's Law analysis
+# Helper: Gaussian distribution analysis
 # ══════════════════════════════════════════════════════════════════════════════
-def calculate_benford_score(claim_amount: float, historical_amounts: pd.Series) -> tuple[float, str]:
+def calculate_gaussian_score(claim_amount: float, diagnosis_code: str) -> tuple[float, str]:
     """
-    Calculates Benford's Law deviation score for a claim amount.
-    
-    Benford's Law states that in naturally occurring datasets, the probability
-    of a number starting with digit d is: P(d) = log10(1 + 1/d)
-    
-    This function checks:
-    1. If the claim's first digit matches the theoretical Benford distribution
-    2. If the provider's historical billing pattern shows suspicious digit clustering
-    
+    Calculates a Gaussian distribution suspicion score for a claim amount.
+
+    Uses DIAG_STATS (mean & std per diagnosis code) to compute a Z-score.
+    Claims that fall far from the expected distribution are flagged.
+
+    Z-score interpretation:
+      |z| < 1  → within 1 std dev → normal
+      |z| 1-2  → slightly elevated → borderline
+      |z| 2-3  → moderately suspicious
+      |z| > 3  → extreme outlier → high suspicion
+
     Returns:
-        - benford_score: 0-100, where higher = more suspicious deviation
+        - gaussian_score: 0–100, where higher = more suspicious
         - analysis: Human-readable explanation
     """
-    if historical_amounts is None or len(historical_amounts) == 0:
-        return 0.0, "Benford's Law analysis unavailable — no historical data"
-    
-    # Extract first digit of the claim amount
-    amount_str = str(int(abs(claim_amount)))
-    first_digit = int(amount_str[0]) if amount_str[0].isdigit() else 0
-    
-    if first_digit == 0:
-        return 0.0, "Amount starts with 0 — Benford's Law not applicable"
-    
-    # Calculate expected frequency for this digit according to Benford's Law
-    expected_prob = math.log10(1 + 1.0 / first_digit)
-    
-    # Calculate actual frequency in historical data (provider's billing pattern)
-    historical_first_digits = historical_amounts.astype(str).str[0].astype(int)
-    historical_first_digits = historical_first_digits[historical_first_digits > 0]  # Remove zeros
-    
-    if len(historical_first_digits) == 0:
-        return 0.0, "Benford's Law analysis unavailable — insufficient historical data"
-    
-    # Count how often this digit appears in historical data
-    actual_count = (historical_first_digits == first_digit).sum()
-    actual_prob = actual_count / len(historical_first_digits)
-    
-    # Calculate deviation from Benford's Law
-    # If a provider's history shows clustering on digit 8 (which should be rare ~5.1%),
-    # that's suspicious
-    deviation = abs(actual_prob - expected_prob)
-    
-    # Convert to 0-100 score (higher = more suspicious)
-    # Maximum possible deviation is ~0.3 (for digit 1), so normalize
-    max_deviation = 0.3
-    benford_score = min(100, (deviation / max_deviation) * 100)
-    
-    # Build explanation
-    if deviation > 0.05:  # Significant deviation (>5 percentage points)
-        direction = "higher" if actual_prob > expected_prob else "lower"
+    stats = DIAG_STATS.get(diagnosis_code, DEFAULT_STATS)
+    mean = stats["mean"]
+    std  = stats["std"]
+
+    if std == 0:
+        return 0.0, "Gaussian analysis unavailable — zero standard deviation"
+
+    z_score = (claim_amount - mean) / std
+    abs_z   = abs(z_score)
+
+    # Map |z| → 0–100 score. Cap at |z|=4 (virtually impossible under normal billing)
+    gaussian_score = min(100.0, (abs_z / 4.0) * 100.0)
+
+    direction = "above" if z_score > 0 else "below"
+
+    if abs_z >= 3:
         analysis = (
-            f"⚠️ Benford's Law Alert: First digit '{first_digit}' appears {direction} than expected. "
-            f"Theoretical frequency: {expected_prob:.1%}, Historical pattern: {actual_prob:.1%}. "
-            f"This clustering may indicate fabricated amounts."
+            f"🚨 Gaussian Alert: ₹{claim_amount:,.0f} is {abs_z:.1f} standard deviations {direction} "
+            f"the expected ₹{mean:,.0f} (±₹{std:,.0f}) for diagnosis {diagnosis_code}. "
+            f"Extreme statistical outlier — strong flag for investigation."
+        )
+    elif abs_z >= 2:
+        analysis = (
+            f"⚠️ Gaussian Warning: ₹{claim_amount:,.0f} is {abs_z:.1f} std deviations {direction} "
+            f"the expected ₹{mean:,.0f} for diagnosis {diagnosis_code}. "
+            f"Moderately suspicious — review recommended."
+        )
+    elif abs_z >= 1:
+        analysis = (
+            f"ℹ️ Gaussian Notice: ₹{claim_amount:,.0f} is {abs_z:.1f} std deviation {direction} "
+            f"the ₹{mean:,.0f} mean for diagnosis {diagnosis_code}. "
+            f"Slightly elevated — within acceptable range."
         )
     else:
         analysis = (
-            f"✓ Benford's Law: First digit '{first_digit}' frequency ({actual_prob:.1%}) "
-            f"matches expected Benford distribution ({expected_prob:.1%})."
+            f"✓ Gaussian: ₹{claim_amount:,.0f} is well within the expected distribution "
+            f"(₹{mean:,.0f} ± ₹{std:,.0f}) for diagnosis {diagnosis_code} (z={z_score:+.2f})."
         )
-    
-    return round(benford_score, 2), analysis
+
+    return round(gaussian_score, 2), analysis
+
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -641,21 +635,17 @@ async def analyze_claim(claim: ClaimRequest):
     except Exception as exc:
         log.warning(f"Isolation Forest failed: {exc}")
 
-    # ── Layer E: Benford's Law Analysis ───────────────────────────────────
-    benford_score = 0.0
-    benford_analysis = "Benford's Law analysis unavailable"
+    # ── Layer E: Gaussian Distribution Analysis ───────────────────────────
+    gaussian_score = 0.0
+    gaussian_analysis = "Gaussian analysis unavailable"
     try:
-        if app_state.historical_claims is not None and len(app_state.historical_claims) > 0:
-            historical_amounts = app_state.historical_claims["Total_Claim_Amount"]
-            benford_score, benford_analysis = calculate_benford_score(
-                claim.Total_Claim_Amount,
-                historical_amounts
-            )
-            log.info(f"Benford's Law score: {benford_score:.2f}/100")
-        else:
-            log.warning("Historical claims data not available for Benford's Law")
+        gaussian_score, gaussian_analysis = calculate_gaussian_score(
+            claim.Total_Claim_Amount,
+            claim.Diagnosis_Code
+        )
+        log.info(f"Gaussian score: {gaussian_score:.2f}/100")
     except Exception as exc:
-        log.warning(f"Benford's Law calculation failed: {exc}")
+        log.warning(f"Gaussian calculation failed: {exc}")
 
     # ── Diagnosis stats for the frontend display ───────────────────────────
     stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
@@ -680,9 +670,9 @@ async def analyze_claim(claim: ClaimRequest):
             "No claim is automatically approved or rejected. "
             "All final decisions must be made by a qualified human investigator."
         ),
-        anomaly_score    = anomaly_score,
-        benford_score    = benford_score,
-        benford_analysis = benford_analysis,
+        anomaly_score     = anomaly_score,
+        gaussian_score    = gaussian_score,
+        gaussian_analysis = gaussian_analysis,
     )
 
 @app.post("/analyze_batch")
