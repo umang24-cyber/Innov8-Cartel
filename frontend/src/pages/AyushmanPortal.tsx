@@ -24,6 +24,34 @@ export const AyushmanPortal: React.FC = () => {
     const [result, setResult] = useState<AyushmanAuditResult | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    const diagnosisCodes = [
+        { code: 'J06.9', label: 'Acute Upper Respiratory Infection' },
+        { code: 'M54.5', label: 'Lower Back Pain' },
+        { code: 'E11.9', label: 'Type 2 Diabetes' },
+        { code: 'I10', label: 'Essential Hypertension' },
+        { code: 'K21.0', label: 'GERD' },
+        { code: 'Z00.00', label: 'General Adult Exam' },
+        { code: 'S72.001', label: 'Femoral Fracture' },
+        { code: 'C34.10', label: 'Malignant Lung Neoplasm' },
+        { code: 'F32.1', label: 'Major Depressive Disorder' },
+        { code: 'N39.0', label: 'Urinary Tract Infection' },
+        { code: 'OTHER', label: 'Other' },
+    ];
+
+    const procedureCodes = [
+        { code: '99213', label: 'Office Visit (Level 3)' },
+        { code: '99214', label: 'Office Visit (Level 4)' },
+        { code: '99232', label: 'Subsequent Hospital Care' },
+        { code: '81003', label: 'Urinalysis' },
+        { code: '71046', label: 'Chest X-Ray' },
+        { code: '90837', label: 'Psychotherapy (60 min)' },
+        { code: '93000', label: 'Electrocardiogram' },
+        { code: '43239', label: 'Upper GI Endoscopy' },
+        { code: '27447', label: 'Total Knee Replacement' },
+        { code: '96413', label: 'Chemotherapy Admin' },
+        { code: 'OTHER', label: 'Other' },
+    ];
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
@@ -110,22 +138,29 @@ export const AyushmanPortal: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Diagnosis Code</label>
-                            <input
-                                type="text"
+                            <select
                                 value={formData.Diagnosis_Code}
                                 onChange={(e) => setFormData({ ...formData, Diagnosis_Code: e.target.value })}
                                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#138808]/50 focus:border-[#138808]"
-                            />
+                            >
+                                <option value="">Select diagnosis...</option>
+                                {diagnosisCodes.map(d => (
+                                    <option key={d.code} value={d.code}>{d.code} — {d.label}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Procedure Code</label>
-                            <input
-                                type="text"
+                            <select
                                 value={formData.Procedure_Code}
                                 onChange={(e) => setFormData({ ...formData, Procedure_Code: e.target.value })}
-                                placeholder="e.g. 99214"
                                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#138808]/50 focus:border-[#138808]"
-                            />
+                            >
+                                <option value="">Select procedure...</option>
+                                {procedureCodes.map(p => (
+                                    <option key={p.code} value={p.code}>{p.code} — {p.label}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Billed Amount (₹)</label>
@@ -157,12 +192,12 @@ export const AyushmanPortal: React.FC = () => {
                         {isLoading ? (
                             <>
                                 <Loader2 size={20} className="animate-spin" />
-                                Running NAFU AI Audit...
+                                Verifying claim details...
                             </>
                         ) : (
                             <>
                                 <Shield size={20} />
-                                Initiate NAFU AI Audit
+                                Initiate NAFU Audit
                             </>
                         )}
                     </button>
@@ -191,25 +226,23 @@ export const AyushmanPortal: React.FC = () => {
                             <AyushmanBadge isVerified={result.abha_verified} abhaId={formData.ABHA_ID} />
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Risk Score:</span>
-                                <span className={`px-3 py-1 rounded-lg font-bold text-lg ${
-                                    result.risk_label === 'CRITICAL' ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' :
-                                    result.risk_label === 'HIGH' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
-                                    'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                                }`}>
+                                <span className={`px-3 py-1 rounded-lg font-bold text-lg ${result.risk_label === 'CRITICAL' ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' :
+                                        result.risk_label === 'HIGH' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
+                                            'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                    }`}>
                                     {result.risk_score}/100
                                 </span>
-                                <span className={`text-sm font-bold px-2 py-0.5 rounded ${
-                                    result.risk_label === 'CRITICAL' ? 'bg-rose-200/60 dark:bg-rose-800/40 text-rose-800 dark:text-rose-200' :
-                                    result.risk_label === 'HIGH' ? 'bg-amber-200/60 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200' :
-                                    'bg-emerald-200/60 dark:bg-emerald-800/40 text-emerald-800 dark:text-emerald-200'
-                                }`}>
+                                <span className={`text-sm font-bold px-2 py-0.5 rounded ${result.risk_label === 'CRITICAL' ? 'bg-rose-200/60 dark:bg-rose-800/40 text-rose-800 dark:text-rose-200' :
+                                        result.risk_label === 'HIGH' ? 'bg-amber-200/60 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200' :
+                                            'bg-emerald-200/60 dark:bg-emerald-800/40 text-emerald-800 dark:text-emerald-200'
+                                    }`}>
                                     {result.risk_label}
                                 </span>
                             </div>
                         </div>
                         <div className="p-6 space-y-4">
                             <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border-l-4 border-[#138808] dark:border-[#138808] shadow-sm">
-                                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">NAFU AI Audit Finding</h4>
+                                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">NAFU Audit Finding</h4>
                                 <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{result.nafu_audit_finding}</p>
                             </div>
                         </div>

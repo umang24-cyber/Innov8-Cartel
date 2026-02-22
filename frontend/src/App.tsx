@@ -163,6 +163,10 @@ function App() {
         setShowProfileSettings(false);
     };
 
+    const handleClaimSaved = (claim: any) => {
+        setClaims((prev: any) => [...prev, claim]);
+    };
+
     if (!isAuthenticated) {
         return <LandingPage onSignUp={signUp} onLogin={login} />;
     }
@@ -350,7 +354,7 @@ function App() {
 
                     {currentView === 'case_manager' && <CaseManager />}
                     {currentView === 'typology' && <TypologyStudio />}
-                    {currentView === 'new_claim' && <NewClaimPage userEmail={user?.email} />}
+                    {currentView === 'new_claim' && <NewClaimPage userEmail={user?.email} onClaimSaved={handleClaimSaved} />}
                     {currentView === 'ayushman_portal' && <AyushmanPortal />}
 
                     {currentView === 'settings' && (
@@ -368,8 +372,8 @@ function App() {
             {isLoadingInit && !error && (
                 <div className="fixed inset-0 z-[100] bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center">
                     <Loader2 size={48} className="text-teal-600 dark:text-teal-400 animate-spin mb-4" />
-                    <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-wide">Initializing VeriClaim AI Core...</h2>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-2">Connecting to FastAPI and ML inference cluster.</p>
+                    <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-wide">Preparing your health claims dashboard...</h2>
+                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-2">Syncing patient records and claim data.</p>
                 </div>
             )}
         </div>

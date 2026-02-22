@@ -4,7 +4,7 @@ import { api } from '../services/api';
 import type { Claim } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) => {
+export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim: Claim) => void }> = ({ userEmail, onClaimSaved }) => {
     const [formData, setFormData] = useState({
         Provider_ID: '',
         ABHA_ID: '91-4567-8912-3456',
@@ -31,6 +31,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
         { code: 'C34.10', label: 'Malignant Lung Neoplasm' },
         { code: 'F32.1', label: 'Major Depressive Disorder' },
         { code: 'N39.0', label: 'Urinary Tract Infection' },
+        { code: 'OTHER', label: 'Other' },
     ];
 
     const procedureCodes = [
@@ -44,6 +45,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
         { code: '43239', label: 'Upper GI Endoscopy' },
         { code: '27447', label: 'Total Knee Replacement' },
         { code: '96413', label: 'Chemotherapy Admin' },
+        { code: 'OTHER', label: 'Other' },
     ];
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -52,7 +54,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
         setResult(null);
         setSaveSuccess(false);
 
-        if (!formData.Provider_ID || !formData.ABHA_ID || !formData.PMJAY_Package_Code || !formData.Diagnosis_Code || !formData.Procedure_Code || !formData.Total_Claim_Amount) {
+        if (!formData.Provider_ID || !formData.Diagnosis_Code || !formData.Procedure_Code || !formData.Total_Claim_Amount) {
             setError('Please fill in all required fields.');
             return;
         }
@@ -104,16 +106,26 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
                 Unstructured_Notes: formData.Unstructured_Notes || 'Manual claim submission.',
             };
             await api.saveClaim(claimData);
-            // Also save to user-specific localStorage
+            // Build the full claim object for syncing
+            const savedClaim: Claim = {
+                ...claimData,
+                claim_id: `MAN-${Date.now().toString(36).toUpperCase()}`,
+                status: 'Pending',
+                riskScore: result?.risk_score,
+                riskLevel: result?.risk_label === 'HIGH' ? 'High' : result?.risk_label === 'MEDIUM' ? 'Medium' : result?.risk_label === 'LOW' ? 'Low' : undefined,
+            };
+            // Save to user-specific localStorage
             if (userEmail) {
                 const storageKey = `vericlaim_claims_${userEmail}`;
                 try {
                     const raw = localStorage.getItem(storageKey);
                     const existing = raw ? JSON.parse(raw) : [];
-                    existing.push({ ...claimData, claim_id: `MAN-${Date.now().toString(36).toUpperCase()}`, status: 'Pending' });
+                    existing.push(savedClaim);
                     localStorage.setItem(storageKey, JSON.stringify(existing));
                 } catch { /* ignore */ }
             }
+            // Notify parent to sync with Alert Queue
+            if (onClaimSaved) onClaimSaved(savedClaim);
             setSaveSuccess(true);
         } catch (err) {
             console.error('Failed to save claim', err);
@@ -140,7 +152,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
                     <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-3xl -translate-y-12 translate-x-12"></div>
                     <div className="relative z-10">
                         <h2 className="text-2xl font-extrabold tracking-wide">Submit New Claim for Analysis</h2>
-                        <p className="text-teal-100 font-medium mt-1">Enter claim details matching the CSV structure to run the full ML pipeline</p>
+                        <p className="text-teal-100 font-medium mt-1">Enter claim details below to run a comprehensive health audit</p>
                     </div>
                 </div>
 
@@ -163,7 +175,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
 
                         {/* ABHA ID */}
                         <div>
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">ABHA ID *</label>
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">ABHA ID <span className="text-slate-400 font-normal normal-case">(Optional)</span></label>
                             <input
                                 type="text"
                                 value={formData.ABHA_ID}
@@ -175,7 +187,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
 
                         {/* PM-JAY Package Code */}
                         <div>
-                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">PM-JAY Package Code *</label>
+                            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5">PM-JAY Package Code <span className="text-slate-400 font-normal normal-case">(Optional)</span></label>
                             <input
                                 type="text"
                                 value={formData.PMJAY_Package_Code}
@@ -283,15 +295,15 @@ export const NewClaimPage: React.FC<{ userEmail?: string }> = ({ userEmail }) =>
                                     <FileText className="w-10 h-10 text-slate-400" />
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">No Claim Analyzed</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">Fill in the claim fields on the left and click <strong>"Analyze Claim"</strong> to run the full ML pipeline (RandomForest → SHAP → Groq LLM).</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm">Fill in the claim fields on the left and click <strong>"Analyze Claim"</strong> to begin a comprehensive claim health check.</p>
                             </div>
                         )}
 
                         {isAnalyzing && (
                             <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl p-12 shadow-sm flex flex-col items-center justify-center text-center h-full min-h-[400px]">
                                 <Loader2 className="w-12 h-12 text-teal-600 dark:text-teal-400 animate-spin mb-4" />
-                                <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">Running ML Inference Pipeline...</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">RandomForest → SHAP Explainability → Isolation Forest → Benford's Law → Groq LLM Audit</p>
+                                <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">Checking vitals and verifying claim...</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Verifying diagnosis · Cross-checking procedures · Reviewing clinical notes</p>
                             </div>
                         )}
 

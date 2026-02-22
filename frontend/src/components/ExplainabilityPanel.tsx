@@ -88,7 +88,7 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                 {!hasBeenAnalyzed && !isAnalyzing && (
                     <section className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 text-center">
                         <p className="text-sm text-amber-800 dark:text-amber-300 font-semibold mb-2">This claim has not been analyzed yet.</p>
-                        <p className="text-xs text-amber-600 dark:text-amber-400">Click <strong>"Investigate"</strong> below to run the ML pipeline, SHAP analysis, and AI clinical audit.</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400">Click <strong>"Investigate"</strong> below to run a comprehensive health claim audit.</p>
                     </section>
                 )}
 
@@ -96,8 +96,8 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                 {isAnalyzing && (
                     <section className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-xl p-6 flex flex-col items-center justify-center">
                         <Loader2 className="w-8 h-8 text-teal-600 dark:text-teal-400 animate-spin mb-3" />
-                        <p className="text-sm text-teal-700 dark:text-teal-300 font-bold">Running ML Inference Pipeline...</p>
-                        <p className="text-xs text-teal-600 dark:text-teal-400 mt-1">RandomForest → SHAP → Groq LLM Audit</p>
+                        <p className="text-sm text-teal-700 dark:text-teal-300 font-bold">Performing health claim audit...</p>
+                        <p className="text-xs text-teal-600 dark:text-teal-400 mt-1">Verifying diagnosis · Checking procedures · Reviewing notes</p>
                     </section>
                 )}
 
@@ -136,8 +136,8 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                             Anomaly Detection (Isolation Forest)
                         </h3>
                         <div className={`p-4 rounded-xl border shadow-sm transition-all duration-300 ${claim.anomalyScore === -1
-                                ? 'bg-orange-50/80 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
-                                : 'bg-teal-50/50 dark:bg-teal-900/20 border-teal-100 dark:border-teal-800'
+                            ? 'bg-orange-50/80 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+                            : 'bg-teal-50/50 dark:bg-teal-900/20 border-teal-100 dark:border-teal-800'
                             }`}>
                             <div className="flex items-center justify-between mb-2">
                                 <span className={`text-sm font-bold ${claim.anomalyScore === -1 ? 'text-orange-700 dark:text-orange-300' : 'text-teal-700 dark:text-teal-300'
@@ -162,8 +162,8 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                             Benford's Law Analysis
                         </h3>
                         <div className={`p-4 rounded-xl border shadow-sm ${claim.benfordScore > 50
-                                ? 'bg-purple-50/80 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
-                                : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'
+                            ? 'bg-purple-50/80 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
+                            : 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'
                             }`}>
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-xs text-slate-600 dark:text-slate-400 uppercase tracking-wider font-bold">Deviation Score</span>
