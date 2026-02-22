@@ -83,6 +83,26 @@ export const api = {
         }
     },
 
+    // Batch analyze a CSV file
+    analyzeBatch: async (file: File) => {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch(`${API_BASE}/analyze_batch`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({ detail: 'Batch processing failed' }));
+                throw new Error(errData.detail || 'Batch processing failed');
+            }
+            return await res.json();
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    },
+
     // 3. Chat with Groq Agentic LLM
     chat: async (message: string, claimContext: Claim | null) => {
         try {

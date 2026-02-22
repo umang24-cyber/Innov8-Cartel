@@ -685,9 +685,10 @@ async def analyze_batch(file: UploadFile = File(...)):
     """
     Enterprise Batch Processing Endpoint.
     Accepts a CSV of claims, processes them through the Random Forest 
-    and Isolation Forest, and returns an annotated CSV with Risk Scores.
+    and Isolation Forest, and returns JSON with annotated claims + CSV string.
+    Each claim is persisted to saved_claims_db and cases_db.
     """
-    if not file.filename.endswith('.csv'):
+    if not file.filename or not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only .csv files are supported")
 
     try:
@@ -706,7 +707,7 @@ async def analyze_batch(file: UploadFile = File(...)):
 
         # 4. Generate Risk Scores using the Random Forest
         rf_model = app_state.pipeline.named_steps["classifier"]
-        probs = rf_model.predict_proba(X_transformed)[:, 1] # Get fraud probabilities
+        probs = rf_model.predict_proba(X_transformed)[:, 1]
         df["Risk_Score"] = (probs * 100).astype(int)
         
         # 5. Assign Risk Labels (LOW, MEDIUM, HIGH)
@@ -719,23 +720,75 @@ async def analyze_batch(file: UploadFile = File(...)):
         # 6. Run Isolation Forest Anomaly Detection
         if app_state.isolation_forest is not None:
             anomalies = app_state.isolation_forest.predict(X_transformed)
-            # Map -1 to "ANOMALY", 1 to "NORMAL"
             df["Anomaly_Flag"] = ["ANOMALY" if x == -1 else "NORMAL" for x in anomalies]
 
-        # 7. Convert the annotated DataFrame back to a CSV in memory
+        # 7. Generate CSV string for download
         stream = io.StringIO()
         df.to_csv(stream, index=False)
-        stream.seek(0) # Reset stream position to the beginning
+        csv_data = stream.getvalue()
 
-        # 8. Return as a downloadable file
-        return StreamingResponse(
-            iter([stream.getvalue()]),
-            media_type="text/csv",
-            headers={
-                "Content-Disposition": f"attachment; filename=scored_{file.filename}"
+        # 8. Persist each claim to saved_claims_db and cases_db
+        now = datetime.now().isoformat()
+        batch_ts = int(datetime.now().timestamp())
+        claim_ids = []
+        records = df.to_dict(orient="records")
+
+        for index, row in enumerate(records):
+            claim_id = row.get("claim_id") or f"BAT-{batch_ts}-{index}"
+            row["claim_id"] = claim_id
+            # Convert numpy/pandas types to native Python for JSON serialization
+            clean_row = {}
+            for k, v in row.items():
+                if isinstance(v, (np.integer,)):
+                    clean_row[k] = int(v)
+                elif isinstance(v, (np.floating,)):
+                    clean_row[k] = float(v)
+                elif isinstance(v, (np.bool_,)):
+                    clean_row[k] = bool(v)
+                else:
+                    clean_row[k] = str(v) if not isinstance(v, (str, int, float, bool, type(None))) else v
+
+            saved_claims_db.append(clean_row)
+
+            risk_label = str(row.get("Risk_Label", "LOW"))
+            case_entry = {
+                "id": f"CASE-{claim_id}",
+                "claim_id": claim_id,
+                "claim": clean_row,
+                "status": "Open",
+                "priority": risk_label.capitalize() if risk_label else "Low",
+                "assignedTo": None,
+                "notes": [],
+                "timeline": [{
+                    "id": f"tl-{claim_id}-1",
+                    "type": "status_change",
+                    "actor": "VeriClaim Batch Import",
+                    "description": f"Batch imported case — Risk Score: {row.get('Risk_Score', 0)}/100",
+                    "timestamp": now,
+                }],
+                "createdAt": now,
+                "updatedAt": now,
             }
-        )
+            cases_db.append(case_entry)
+            claim_ids.append(claim_id)
 
+        log.info(f"Batch processed: {len(records)} claims saved to DB")
+
+        # 9. Return JSON with claims list + CSV data for download
+        return {
+            "claims": [r for r in records],
+            "csv_data": csv_data,
+            "summary": {
+                "total": len(records),
+                "high_risk": int((df["Risk_Score"] >= 60).sum()),
+                "medium_risk": int(((df["Risk_Score"] >= 30) & (df["Risk_Score"] < 60)).sum()),
+                "low_risk": int((df["Risk_Score"] < 30).sum()),
+                "claim_ids": claim_ids,
+            }
+        }
+
+    except HTTPException:
+        raise
     except Exception as exc:
         log.error(f"Batch processing failed: {exc}")
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(exc)}")

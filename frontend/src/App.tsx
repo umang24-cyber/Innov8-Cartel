@@ -382,7 +382,7 @@ function App() {
 
                     {currentView === 'case_manager' && <CaseManager investigatedClaims={claims.filter(c => c.status === 'Investigated' || c.status === 'Done')} />}
                     {currentView === 'typology' && <TypologyStudio />}
-                    {currentView === 'new_claim' && <NewClaimPage userEmail={user?.email} onClaimSaved={handleClaimSaved} />}
+                    {currentView === 'new_claim' && <NewClaimPage userEmail={user?.email} onClaimSaved={handleClaimSaved} onNavigate={(view: string) => setCurrentView(view)} />}
                     {currentView === 'ayushman_portal' && <AyushmanPortal />}
 
                     {currentView === 'settings' && <Settings />}
