@@ -8,6 +8,7 @@ import { Overview } from './pages/Overview';
 import { TypologyStudio } from './pages/TypologyStudio';
 import { CaseManager } from './pages/CaseManager';
 import { NewClaimPage } from './pages/NewClaimPage';
+import { AyushmanPortal } from './pages/AyushmanPortal';
 import { Prologue } from './components/Prologue';
 import type { Claim, ViewState } from './types';
 import { api } from './services/api';
@@ -184,6 +185,7 @@ function App() {
                                 {currentView === 'typology' && 'Typology Studio'}
                                 {currentView === 'settings' && 'System Settings'}
                                 {currentView === 'new_claim' && 'New Claim Analysis'}
+                                {currentView === 'ayushman_portal' && 'AB-PMJAY Portal'}
                             </h1>
                             <p className="text-slate-500 dark:text-slate-400 text-sm mt-1.5 font-semibold tracking-wide flex items-center">
                                 <Activity size={14} className="mr-1.5 text-teal-500" />
@@ -332,6 +334,7 @@ function App() {
                     {currentView === 'case_manager' && <CaseManager />}
                     {currentView === 'typology' && <TypologyStudio />}
                     {currentView === 'new_claim' && <NewClaimPage />}
+                    {currentView === 'ayushman_portal' && <AyushmanPortal />}
 
                     {currentView === 'settings' && (
                         <div className="flex-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm flex flex-col items-center justify-center text-slate-400">

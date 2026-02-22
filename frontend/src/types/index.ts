@@ -109,4 +109,4 @@ export interface RiskDistribution {
   percentage: number;
 }
 
-export type ViewState = 'overview' | 'queue' | 'case_manager' | 'typology' | 'settings' | 'new_claim';
+export type ViewState = 'overview' | 'queue' | 'case_manager' | 'typology' | 'settings' | 'new_claim' | 'ayushman_portal';
