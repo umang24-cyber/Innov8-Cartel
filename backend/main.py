@@ -1275,6 +1275,52 @@ async def explain_risk(explain_request: dict):
         "explanation": f"AI analysis for claim {claim_id}: {question}. This claim shows elevated risk due to multiple factors including amount deviation, provider history, and anomaly detection flags."
     }
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+# NAFU Admin Settings (rules, thresholds, default model — no API keys stored)
+# ══════════════════════════════════════════════════════════════════════════════
+class SettingsPayload(BaseModel):
+    opdToIpdDetection: Optional[bool] = True
+    walletDepletionTracker: Optional[bool] = True
+    hbpUpcodingAnalysis: Optional[bool] = True
+    criticalRiskThreshold: Optional[int] = 65
+    highRiskThreshold: Optional[int] = 40
+    defaultAuditorModel: Optional[str] = "Llama-3.3-70b (Groq)"
+
+app_settings_store = {
+    "opdToIpdDetection": True,
+    "walletDepletionTracker": True,
+    "hbpUpcodingAnalysis": True,
+    "criticalRiskThreshold": 65,
+    "highRiskThreshold": 40,
+    "defaultAuditorModel": "Llama-3.3-70b (Groq)",
+}
+
+
+@app.get("/api/settings")
+async def get_settings():
+    """Return current NAFU admin settings (rules, thresholds, default model)."""
+    return app_settings_store
+
+
+@app.post("/api/settings")
+async def save_settings(payload: SettingsPayload):
+    """Update NAFU admin settings. API keys are not stored server-side."""
+    if payload.opdToIpdDetection is not None:
+        app_settings_store["opdToIpdDetection"] = payload.opdToIpdDetection
+    if payload.walletDepletionTracker is not None:
+        app_settings_store["walletDepletionTracker"] = payload.walletDepletionTracker
+    if payload.hbpUpcodingAnalysis is not None:
+        app_settings_store["hbpUpcodingAnalysis"] = payload.hbpUpcodingAnalysis
+    if payload.criticalRiskThreshold is not None:
+        app_settings_store["criticalRiskThreshold"] = max(0, min(100, payload.criticalRiskThreshold))
+    if payload.highRiskThreshold is not None:
+        app_settings_store["highRiskThreshold"] = max(0, min(100, payload.highRiskThreshold))
+    if payload.defaultAuditorModel is not None:
+        app_settings_store["defaultAuditorModel"] = payload.defaultAuditorModel
+    return app_settings_store
+
+
 @app.get("/{full_path:path}")
 async def serve_react(full_path: str):
     return FileResponse("../frontend/dist/index.html")
