@@ -78,19 +78,19 @@ ALL_FEATURES         = CATEGORICAL_FEATURES + NUMERIC_FEATURES
 # Used to calculate z-scores for the SHAP narrative.
 # In production these would be computed from real historical data and persisted.
 DIAG_STATS = {
-    "J06.9":  {"mean": 150,    "std": 40},
-    "M54.5":  {"mean": 320,    "std": 80},
-    "E11.9":  {"mean": 600,    "std": 150},
-    "I10":    {"mean": 500,    "std": 120},
-    "K21.0":  {"mean": 280,    "std": 70},
-    "Z00.00": {"mean": 200,    "std": 50},
-    "S72.001":{"mean": 8500,   "std": 900},
-    "C34.10": {"mean": 12000,  "std": 2000},
-    "F32.1":  {"mean": 400,    "std": 100},
-    "N39.0":  {"mean": 180,    "std": 45},
+    "J06.9":  {"mean": 2000,    "std": 500},     # Throat/Minor Med
+    "M54.5":  {"mean": 3500,    "std": 1000},    # Back pain
+    "E11.9":  {"mean": 2500,    "std": 800},     # Diabetes
+    "I10":    {"mean": 140000,  "std": 20000},   # Cardiology / CABG
+    "K21.0":  {"mean": 25000,   "std": 5000},    # Surgery / Appendectomy
+    "Z00.00": {"mean": 15000,   "std": 3000},    # Maternity / General
+    "S72.001":{"mean": 45000,   "std": 8000},    # Fracture
+    "C34.10": {"mean": 15000,   "std": 4000},    # Oncology / Chemo
+    "F32.1":  {"mean": 1500,    "std": 400},     # Psych
+    "N39.0":  {"mean": 3000,    "std": 800},     # UTI
 }
 # Fallback stats when diagnosis code is unknown
-DEFAULT_STATS = {"mean": 1200.0, "std": 2500.0}
+DEFAULT_STATS = {"mean": 15000.0, "std": 5000.0}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
