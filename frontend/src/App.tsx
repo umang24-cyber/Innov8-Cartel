@@ -113,6 +113,7 @@ function App() {
                         anomalyScore: result.anomaly_score,
                         gaussianScore: result.gaussian_score,
                         gaussianAnalysis: result.gaussian_analysis,
+                        triggeredTypologies: result.triggered_typologies,
                         status: 'Investigated'
                     }
                     : c
@@ -140,6 +141,7 @@ function App() {
                     anomalyScore: undefined,
                     gaussianScore: undefined,
                     gaussianAnalysis: undefined,
+                    triggeredTypologies: undefined,
                     status: 'Cleared'
                 }
                 : c

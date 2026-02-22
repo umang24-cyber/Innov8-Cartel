@@ -280,8 +280,54 @@ class ClaimResponse(BaseModel):
     anomaly_score:      int          # -1 = anomaly detected, 1 = normal
     gaussian_score:     float        # 0-100, higher = more suspicious (z-score based)
     gaussian_analysis:  str          # Human-readable Gaussian explanation
+    triggered_typologies: list[dict] # List of active typologies whose rules fired
 
 
+# ════════════════════════════════════════════════════════════════════════════════
+# Helper: Typology rule evaluator
+# ════════════════════════════════════════════════════════════════════════════════
+def evaluate_typologies(metrics: dict) -> list[dict]:
+    """
+    Evaluates all active typologies against computed claim metrics.
+
+    Each typology has a list of text rules (e.g. "z_score > 2.5",
+    "anomaly_score == -1"). We safely evaluate them using Python's eval()
+    with the metrics dict as the local namespace.
+
+    A typology fires if ANY of its rules evaluates to True.
+
+    Args:
+        metrics: dict of computed values available to rules:
+            risk_score, z_score, anomaly_score, gaussian_score,
+            Total_Claim_Amount, expected_mean, expected_std
+
+    Returns:
+        List of triggered typology dicts (name, severity, riskWeight, rules_fired)
+    """
+    triggered = []
+    for typology in typologies_db:
+        if not typology.get("isActive", False):
+            continue
+        rules_fired = []
+        for rule in typology.get("rules", []):
+            try:
+                result = eval(rule, {"__builtins__": {}}, metrics)  # noqa: S307
+                if result:
+                    rules_fired.append(rule)
+            except Exception as exc:
+                log.debug(f"Typology rule eval error ({rule}): {exc}")
+        if rules_fired:
+            triggered.append({
+                "id":         typology["id"],
+                "name":       typology["name"],
+                "severity":   typology.get("severity", "Medium"),
+                "riskWeight": typology.get("riskWeight", 50),
+                "rulesFired": rules_fired,
+            })
+            # Increment frequency counter
+            typology["frequency"] = typology.get("frequency", 0) + 1
+            typology["lastTriggered"] = datetime.now().isoformat()
+    return triggered
 # ══════════════════════════════════════════════════════════════════════════════
 # Helper: Gaussian distribution analysis
 # ══════════════════════════════════════════════════════════════════════════════
@@ -647,8 +693,23 @@ async def analyze_claim(claim: ClaimRequest):
     except Exception as exc:
         log.warning(f"Gaussian calculation failed: {exc}")
 
-    # ── Diagnosis stats for the frontend display ───────────────────────────
     stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
+    z_score = round((claim.Total_Claim_Amount - stats["mean"]) / stats["std"], 2)
+
+    # ── Layer F: Typology Rule Evaluation ───────────────────────────────────
+    # Evaluate all active typologies from the Typology Studio against
+    # the computed metrics for this claim. Returns a list of fired typologies.
+    typology_metrics = {
+        "risk_score":          risk_score,
+        "z_score":             z_score,
+        "anomaly_score":       anomaly_score,
+        "gaussian_score":      gaussian_score,
+        "Total_Claim_Amount":  claim.Total_Claim_Amount,
+        "expected_mean":       stats["mean"],
+        "expected_std":        stats["std"],
+    }
+    triggered_typologies = evaluate_typologies(typology_metrics)
+    log.info(f"Typologies triggered: {len(triggered_typologies)} / {len([t for t in typologies_db if t.get('isActive')])} active")
 
     return ClaimResponse(
         risk_score        = risk_score,
@@ -661,18 +722,17 @@ async def analyze_claim(claim: ClaimRequest):
             "expected_mean":   stats["mean"],
             "expected_std":    stats["std"],
             "billed_amount":   claim.Total_Claim_Amount,
-            "z_score":         round(
-                (claim.Total_Claim_Amount - stats["mean"]) / stats["std"], 2
-            ),
+            "z_score":         z_score,
         },
         advisory_note = (
             "⚠️  ADVISORY TOOL ONLY — This system flags anomalies for human review. "
             "No claim is automatically approved or rejected. "
             "All final decisions must be made by a qualified human investigator."
         ),
-        anomaly_score     = anomaly_score,
-        gaussian_score    = gaussian_score,
-        gaussian_analysis = gaussian_analysis,
+        anomaly_score        = anomaly_score,
+        gaussian_score       = gaussian_score,
+        gaussian_analysis    = gaussian_analysis,
+        triggered_typologies = triggered_typologies,
     )
 
 @app.post("/analyze_batch")
@@ -1277,14 +1337,14 @@ async def get_typologies():
             },
             {
                 "id": "typ-2",
-                "name": "Benford's Law Violation",
-                "description": "Detects suspicious digit distribution patterns",
+                "name": "Gaussian Distribution Outlier",
+                "description": "Detects suspicious billing amounts via z-score (Gaussian distribution)",
                 "riskWeight": 70,
                 "frequency": 89,
                 "lastTriggered": (datetime.now() - timedelta(hours=5)).isoformat(),
                 "isActive": True,
                 "severity": "Medium",
-                "rules": ["benford_score > 60"],
+                "rules": ["gaussian_score > 60"],
                 "createdAt": (datetime.now() - timedelta(days=25)).isoformat(),
             },
             {
@@ -1298,6 +1358,18 @@ async def get_typologies():
                 "severity": "High",
                 "rules": ["anomaly_score == -1"],
                 "createdAt": (datetime.now() - timedelta(days=20)).isoformat(),
+            },
+            {
+                "id": "typ-4",
+                "name": "High ML Risk Score",
+                "description": "Random Forest model assigned a HIGH fraud probability",
+                "riskWeight": 90,
+                "frequency": 67,
+                "lastTriggered": (datetime.now() - timedelta(hours=1)).isoformat(),
+                "isActive": True,
+                "severity": "Critical",
+                "rules": ["risk_score >= 60"],
+                "createdAt": (datetime.now() - timedelta(days=15)).isoformat(),
             },
         ])
     return typologies_db

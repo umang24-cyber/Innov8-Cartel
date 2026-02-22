@@ -27,6 +27,7 @@ export interface Claim {
   anomalyScore?: number;
   gaussianScore?: number;
   gaussianAnalysis?: string;
+  triggeredTypologies?: Array<{ id: string; name: string; severity: string; riskWeight: number; rulesFired: string[] }>;
 }
 
 export interface Case {

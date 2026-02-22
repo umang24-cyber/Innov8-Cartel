@@ -183,6 +183,52 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                     </section>
                 )}
 
+                {/* Triggered Typologies */}
+                {hasBeenAnalyzed && claim.triggeredTypologies && claim.triggeredTypologies.length > 0 && (
+                    <section className="transition-all duration-500 animate-in fade-in slide-in-from-bottom-4">
+                        <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-3 flex items-center">
+                            <AlertTriangle className="mr-2 text-red-500" size={14} />
+                            Triggered Typologies ({claim.triggeredTypologies.length})
+                        </h3>
+                        <div className="space-y-2">
+                            {claim.triggeredTypologies.map((typ) => {
+                                const sevColor = typ.severity === 'Critical' ? 'red' : typ.severity === 'High' ? 'orange' : typ.severity === 'Medium' ? 'yellow' : 'blue';
+                                const colorMap: Record<string, string> = {
+                                    red: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
+                                    orange: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800',
+                                    yellow: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
+                                    blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
+                                };
+                                const badgeMap: Record<string, string> = {
+                                    red: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                                    orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+                                    yellow: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+                                    blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+                                };
+                                return (
+                                    <div key={typ.id} className={`p-3 rounded-xl border shadow-sm ${colorMap[sevColor]}`}>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{typ.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-500 dark:text-slate-400">Risk: {typ.riskWeight}/100</span>
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${badgeMap[sevColor]}`}>{typ.severity}</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            {typ.rulesFired.map((rule, i) => (
+                                                <div key={i} className="flex items-center gap-1.5">
+                                                    <span className="text-[10px] text-slate-400">▶</span>
+                                                    <code className="text-[10px] font-mono text-slate-600 dark:text-slate-400 bg-white/60 dark:bg-slate-800/60 px-1.5 py-0.5 rounded">{rule}</code>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </section>
+                )}
+
                 {/* AI Auditor Section (Groq) */}
                 {hasBeenAnalyzed && claim.llmAnalysis && (
                     <section className="transition-all duration-500 animate-in fade-in slide-in-from-bottom-4">
