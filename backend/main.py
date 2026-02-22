@@ -1048,14 +1048,29 @@ async def demo_claims(
     Returns sample claims + locally saved claims, now supporting search and filtering from the UI.
     """
     claims = [
-        {"claim_id": "CLM-8492", "Provider_ID": "PRV-0007", "ABHA_ID": "91-4567-8912-3456", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "J06.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 15000, "Unstructured_Notes": "Mild sore throat, prescribed lozenges."},
-        {"claim_id": "CLM-8491", "Provider_ID": "PRV-0013", "ABHA_ID": "91-2234-5678-9012", "PMJAY_Package_Code": "BM002B", "Diagnosis_Code": "M54.5",  "Procedure_Code": "99213", "Total_Claim_Amount": 8900,  "Unstructured_Notes": "Patient reports chronic lower back pain. Prescribed NSAIDs."},
-        {"claim_id": "CLM-8490", "Provider_ID": "PRV-0001", "ABHA_ID": "91-3456-7890-1234", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "E11.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 580,   "Unstructured_Notes": "Routine diabetes management visit. A1C reviewed. Metformin refilled."},
-        {"claim_id": "CLM-8489", "Provider_ID": "PRV-0031", "ABHA_ID": "91-5678-9012-3456", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "Z00.00", "Procedure_Code": "99213", "Total_Claim_Amount": 12000, "Unstructured_Notes": "Annual physical. No complaints."},
-        {"claim_id": "CLM-8488", "Provider_ID": "PRV-0002", "ABHA_ID": "91-6789-0123-4567", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "I10",    "Procedure_Code": "93000", "Total_Claim_Amount": 490,   "Unstructured_Notes": "BP 145/92. Adjusted lisinopril dosage. ECG normal."},
-        {"claim_id": "CLM-8487", "Provider_ID": "PRV-0007", "ABHA_ID": "91-7890-1234-5678", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "N39.0",  "Procedure_Code": "81003", "Total_Claim_Amount": 5500,  "Unstructured_Notes": "UTI confirmed by urinalysis. Prescribed trimethoprim."},
-        {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "ABHA_ID": "91-8901-2345-6789", "PMJAY_Package_Code": "BM002B", "Diagnosis_Code": "F32.1",  "Procedure_Code": "90837", "Total_Claim_Amount": 420,   "Unstructured_Notes": "60-minute psychotherapy session. Patient reporting improved mood."},
-        {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "ABHA_ID": "91-9012-3456-7890", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 260,   "Unstructured_Notes": "Endoscopy showed mild esophageal irritation. Prescribed PPI."},
+        # CRITICAL RISK: Wallet Depletion (General Med billed at ₹4.8 Lakhs)
+        {"claim_id": "CLM-8492", "Provider_ID": "PRV-0007", "ABHA_ID": "91-4567-8912-3456", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "J06.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 485000, "Unstructured_Notes": "Mild sore throat, prescribed lozenges. Patient admitted to ICU for 15 days observation."},
+        
+        # CRITICAL RISK: Upcoding (Normal Delivery billed at ₹3.9 Lakhs)
+        {"claim_id": "CLM-8491", "Provider_ID": "PRV-0013", "ABHA_ID": "91-2234-5678-9012", "PMJAY_Package_Code": "MC012A", "Diagnosis_Code": "Z00.00",  "Procedure_Code": "99213", "Total_Claim_Amount": 395000,  "Unstructured_Notes": "Normal vaginal delivery, no complications. Discharged next day."},
+        
+        # CRITICAL RISK: Extreme Anomaly (Routine Appendectomy billed at ₹4.2 Lakhs)
+        {"claim_id": "CLM-8490", "Provider_ID": "PRV-0001", "ABHA_ID": "91-3456-7890-1234", "PMJAY_Package_Code": "SG001B", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 420000,   "Unstructured_Notes": "Routine appendectomy performed. Patient stable."},
+        
+        # NORMAL: Cardiology (CABG / Heart Bypass is legitimately expensive)
+        {"claim_id": "CLM-8489", "Provider_ID": "PRV-0031", "ABHA_ID": "91-5678-9012-3456", "PMJAY_Package_Code": "CV045C", "Diagnosis_Code": "I10", "Procedure_Code": "93000", "Total_Claim_Amount": 145000, "Unstructured_Notes": "CABG successfully performed. Patient in ICU recovering well. Vitals stable."},
+        
+        # NORMAL: Oncology (Chemotherapy cycle)
+        {"claim_id": "CLM-8488", "Provider_ID": "PRV-0002", "ABHA_ID": "91-6789-0123-4567", "PMJAY_Package_Code": "ON003A", "Diagnosis_Code": "C34.10",    "Procedure_Code": "96413", "Total_Claim_Amount": 12500,   "Unstructured_Notes": "Cycle 3 of IV chemotherapy administered for lung carcinoma. No adverse reactions."},
+        
+        # NORMAL: Maternity (Normal Delivery)
+        {"claim_id": "CLM-8487", "Provider_ID": "PRV-0007", "ABHA_ID": "91-7890-1234-5678", "PMJAY_Package_Code": "MC012A", "Diagnosis_Code": "Z00.00",  "Procedure_Code": "81003", "Total_Claim_Amount": 14000,  "Unstructured_Notes": "Normal delivery. Mother and baby healthy. Routine postnatal care provided."},
+        
+        # NORMAL: General Medicine (Diabetes Management)
+        {"claim_id": "CLM-8486", "Provider_ID": "PRV-0005", "ABHA_ID": "91-8901-2345-6789", "PMJAY_Package_Code": "BM001A", "Diagnosis_Code": "E11.9",  "Procedure_Code": "99214", "Total_Claim_Amount": 2800,   "Unstructured_Notes": "Routine diabetes management visit. A1C reviewed. Adjusted Metformin dosage."},
+        
+        # NORMAL: General Surgery (Appendectomy)
+        {"claim_id": "CLM-8485", "Provider_ID": "PRV-0003", "ABHA_ID": "91-9012-3456-7890", "PMJAY_Package_Code": "SG001B", "Diagnosis_Code": "K21.0",  "Procedure_Code": "43239", "Total_Claim_Amount": 23500,   "Unstructured_Notes": "Appendectomy performed without complications. Mild bleeding controlled. Discharged after 2 days."},
     ]
     
     # Append the globally stored dynamic claims
