@@ -1,13 +1,20 @@
 import React from 'react';
 import { LayoutDashboard, AlertCircle, Briefcase, Activity, Settings, ShieldPlus, Plus } from 'lucide-react';
 import type { ViewState } from '../types';
+import type { UserProfile } from '../hooks/useAuth';
 
 interface SidebarProps {
     currentView: ViewState;
     onViewChange: (view: ViewState) => void;
+    user?: UserProfile | null;
+    onProfileClick?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, user, onProfileClick }) => {
+    const initials = user?.username
+        ? user.username.slice(0, 2).toUpperCase()
+        : user?.email?.slice(0, 2).toUpperCase() || 'VC';
+
     return (
         <aside className="w-64 h-screen bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-r border-slate-200 dark:border-slate-700 flex flex-col pt-6 relative overflow-hidden transition-all duration-300 shadow-xl z-20">
             {/* Ambient background glow */}
@@ -27,8 +34,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
                 <button
                     onClick={() => onViewChange('new_claim')}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 ${currentView === 'new_claim'
-                            ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-500/30'
-                            : 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-md shadow-teal-500/20 hover:shadow-lg hover:shadow-teal-500/30'
+                        ? 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-lg shadow-teal-500/30'
+                        : 'bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-md shadow-teal-500/20 hover:shadow-lg hover:shadow-teal-500/30'
                         }`}
                 >
                     <Plus size={18} strokeWidth={2.5} />
@@ -52,18 +59,24 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
 
             <div className="p-4 mt-auto border-t border-slate-200 dark:border-slate-700 relative z-10 bg-slate-50/80 dark:bg-slate-800/80 backdrop-blur-md">
                 <NavItem icon={<Settings size={20} />} label="Settings" active={currentView === 'settings'} onClick={() => onViewChange('settings')} />
-                <div className="mt-4 flex items-center px-2 py-2 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-sm transition-all hover:border-teal-300 dark:hover:border-teal-500 hover:shadow-md cursor-pointer group">
-                    <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-600 border border-slate-200 dark:border-slate-500 flex items-center justify-center text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600">
-                        AI
+
+                {/* User Profile Section */}
+                <button
+                    onClick={onProfileClick}
+                    className="mt-4 w-full flex items-center px-2 py-2 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 shadow-sm transition-all hover:border-teal-300 dark:hover:border-teal-500 hover:shadow-md cursor-pointer group"
+                >
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-xs font-black text-white shadow-md shadow-teal-500/25 group-hover:shadow-teal-500/40 transition-shadow flex-shrink-0">
+                        {initials}
                     </div>
-                    <div className="ml-3 flex-1">
-                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Anti-Fraud Copilot</p>
-                        <p className="text-[10px] text-teal-600 dark:text-teal-400 uppercase tracking-widest font-bold flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-teal-500 mr-1.5 animate-pulse shadow-[0_0_5px_#14b8a6]"></span>
-                            Active
+                    <div className="ml-3 flex-1 text-left overflow-hidden">
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">
+                            {user?.username || 'User'}
+                        </p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate font-medium">
+                            {user?.email || 'user@vericlaim.ai'}
                         </p>
                     </div>
-                </div>
+                </button>
             </div>
         </aside>
     );

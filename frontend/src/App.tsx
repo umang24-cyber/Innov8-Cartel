@@ -11,14 +11,17 @@ import { NewClaimPage } from './pages/NewClaimPage';
 import { AyushmanPortal } from './pages/AyushmanPortal';
 import { Prologue } from './components/Prologue';
 import { LoginPage } from './components/LoginPage';
+import { ProfileSettings } from './components/ProfileSettings';
 import type { Claim, ViewState } from './types';
 import { api } from './services/api';
 import { Loader2, Activity, RefreshCw, Moon, Sun, Bell } from 'lucide-react';
 import { useTheme } from './hooks/useTheme';
+import { useAuth } from './hooks/useAuth';
 import { toast } from './utils/toast';
 
 function App() {
     const { theme, toggleTheme } = useTheme();
+    const { user, isAuthenticated, signUp, login, logout, updateProfile, deleteAccount } = useAuth();
     const [currentView, setCurrentView] = useState<ViewState>('overview');
     const [prevView, setPrevView] = useState<ViewState>('overview');
     const [isTransitioning, setIsTransitioning] = useState(false);
@@ -28,9 +31,7 @@ function App() {
     const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showNotifications, setShowNotifications] = useState(false);
-    const [showLogin, setShowLogin] = useState(() => {
-        return !sessionStorage.getItem('vericlaim_authenticated');
-    });
+    const [showProfileSettings, setShowProfileSettings] = useState(false);
     const [showPrologue, setShowPrologue] = useState(() => {
         return !sessionStorage.getItem('vericlaim_prologue_seen');
     });
@@ -161,17 +162,22 @@ function App() {
     const investigatingClaims = claims.filter(c => c.status === 'Investigating');
     const totalFlagged = claims.filter(c => c.riskScore !== undefined && c.riskScore > 40).length;
 
-    const handleLoginComplete = () => {
-        sessionStorage.setItem('vericlaim_authenticated', 'true');
-        setShowLogin(false);
+    const handleLogout = () => {
+        logout();
+        setShowProfileSettings(false);
+    };
+
+    const handleDeleteAccount = () => {
+        deleteAccount();
+        setShowProfileSettings(false);
     };
 
     if (showPrologue) {
         return <Prologue onComplete={handlePrologueComplete} />;
     }
 
-    if (showLogin) {
-        return <LoginPage onAuthenticated={handleLoginComplete} />;
+    if (!isAuthenticated) {
+        return <LoginPage onSignUp={signUp} onLogin={login} />;
     }
 
     return (
@@ -180,7 +186,18 @@ function App() {
             {/* Legal Disclaimer Popup */}
             <DisclaimerModal />
 
-            <Sidebar currentView={currentView} onViewChange={handleViewChange} />
+            <Sidebar currentView={currentView} onViewChange={handleViewChange} user={user} onProfileClick={() => setShowProfileSettings(true)} />
+
+            {/* Profile Settings Modal */}
+            {showProfileSettings && user && (
+                <ProfileSettings
+                    user={user}
+                    onClose={() => setShowProfileSettings(false)}
+                    onUpdateProfile={updateProfile}
+                    onDeleteAccount={handleDeleteAccount}
+                    onLogout={handleLogout}
+                />
+            )}
 
             <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
                 {/* Background Elements */}

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { ShieldCheck, Mail, Lock, Eye, EyeOff, ArrowRight, Sparkles } from 'lucide-react';
 
 interface LoginPageProps {
-    onAuthenticated: () => void;
+    onSignUp: (email: string, password: string) => { success: boolean; error?: string };
+    onLogin: (email: string, password: string) => { success: boolean; error?: string };
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ onSignUp, onLogin }) => {
     const [isSignUp, setIsSignUp] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -28,17 +29,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
             setError('Passwords do not match.');
             return;
         }
+        if (password.length < 4) {
+            setError('Password must be at least 4 characters.');
+            return;
+        }
 
         setIsLoading(true);
-        // Simulate auth delay for smooth UX
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise(r => setTimeout(r, 800));
+
+        const result = isSignUp ? onSignUp(email, password) : onLogin(email, password);
         setIsLoading(false);
 
-        // Trigger fade out → then unmount
+        if (!result.success) {
+            setError(result.error || 'Authentication failed.');
+            return;
+        }
+
+        // Success — fade out
         setFadeOut(true);
-        setTimeout(() => {
-            onAuthenticated();
-        }, 600);
     };
 
     return (
@@ -52,7 +60,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
             <div className="absolute bottom-[10%] right-[10%] w-[400px] h-[400px] bg-cyan-500/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
             <div className="absolute top-[50%] left-[60%] w-[300px] h-[300px] bg-indigo-500/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
 
-            {/* Subtle grid pattern overlay */}
+            {/* Subtle grid */}
             <div className="absolute inset-0 opacity-[0.03]" style={{
                 backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)',
                 backgroundSize: '30px 30px',
@@ -61,14 +69,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
             {/* Main content */}
             <div className="relative z-10 flex flex-col items-center w-full max-w-md px-6">
 
-                {/* Logo + Quote section */}
+                {/* Logo + Quote */}
                 <div className="text-center mb-10 animate-[fadeIn_1s_ease-out]">
                     <div className="flex items-center justify-center gap-3 mb-6">
                         <div className="relative">
                             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-xl shadow-teal-500/30">
                                 <ShieldCheck className="w-7 h-7 text-white" />
                             </div>
-                            {/* Glint sweep on logo */}
                             <div className="absolute inset-0 rounded-2xl overflow-hidden">
                                 <div className="glint-sweep" />
                             </div>
@@ -89,21 +96,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
 
                 {/* Glassmorphism card */}
                 <div className="relative w-full animate-[slideIn_0.8s_ease-out_0.3s_both]">
-                    {/* Card outer glow */}
                     <div className="absolute -inset-0.5 bg-gradient-to-r from-teal-500/20 via-cyan-500/20 to-teal-500/20 rounded-3xl blur-sm" />
 
-                    <div className="relative bg-white/[0.06] backdrop-blur-2xl border border-white/[0.08] rounded-3xl p-8 shadow-2xl overflow-hidden">
-
-                        {/* Glint sweep across card */}
+                    <div className="relative bg-white/[0.07] backdrop-blur-2xl border border-white/[0.1] rounded-3xl p-8 shadow-2xl overflow-hidden">
                         <div className="absolute inset-0 overflow-hidden rounded-3xl pointer-events-none">
                             <div className="glint-sweep-slow" />
                         </div>
-
-                        {/* Inner top glow line */}
                         <div className="absolute top-0 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-teal-400/40 to-transparent" />
 
                         {/* Tab toggle */}
-                        <div className="flex mb-8 bg-white/[0.04] rounded-2xl p-1 border border-white/[0.06]">
+                        <div className="flex mb-8 bg-white/[0.05] rounded-2xl p-1 border border-white/[0.08]">
                             <button
                                 onClick={() => { setIsSignUp(false); setError(''); }}
                                 className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${!isSignUp
@@ -135,7 +137,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         placeholder="analyst@vericlaim.ai"
-                                        className="w-full pl-11 pr-4 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-slate-600 text-sm font-medium transition-all duration-300 focus:outline-none focus:border-teal-500/50 focus:bg-white/[0.06] focus:shadow-[0_0_20px_rgba(20,184,166,0.1)] hover:border-white/[0.15]"
+                                        className="w-full pl-11 pr-4 py-3.5 bg-white/[0.06] border border-white/[0.1] rounded-xl text-white placeholder-slate-400/60 text-sm font-medium transition-all duration-300 focus:outline-none focus:border-teal-500/50 focus:bg-white/[0.08] focus:shadow-[0_0_20px_rgba(20,184,166,0.1)] hover:border-white/[0.2]"
                                     />
                                 </div>
                             </div>
@@ -149,8 +151,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
                                         type={showPassword ? 'text' : 'password'}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••••"
-                                        className="w-full pl-11 pr-12 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-slate-600 text-sm font-medium transition-all duration-300 focus:outline-none focus:border-teal-500/50 focus:bg-white/[0.06] focus:shadow-[0_0_20px_rgba(20,184,166,0.1)] hover:border-white/[0.15]"
+                                        placeholder="Enter your password"
+                                        className="w-full pl-11 pr-12 py-3.5 bg-white/[0.06] border border-white/[0.1] rounded-xl text-white placeholder-slate-400/60 text-sm font-medium transition-all duration-300 focus:outline-none focus:border-teal-500/50 focus:bg-white/[0.08] focus:shadow-[0_0_20px_rgba(20,184,166,0.1)] hover:border-white/[0.2]"
                                     />
                                     <button
                                         type="button"
@@ -172,8 +174,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
                                             type={showConfirm ? 'text' : 'password'}
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
-                                            placeholder="••••••••••"
-                                            className="w-full pl-11 pr-12 py-3.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-white placeholder-slate-600 text-sm font-medium transition-all duration-300 focus:outline-none focus:border-teal-500/50 focus:bg-white/[0.06] focus:shadow-[0_0_20px_rgba(20,184,166,0.1)] hover:border-white/[0.15]"
+                                            placeholder="Confirm your password"
+                                            className="w-full pl-11 pr-12 py-3.5 bg-white/[0.06] border border-white/[0.1] rounded-xl text-white placeholder-slate-400/60 text-sm font-medium transition-all duration-300 focus:outline-none focus:border-teal-500/50 focus:bg-white/[0.08] focus:shadow-[0_0_20px_rgba(20,184,166,0.1)] hover:border-white/[0.2]"
                                         />
                                         <button
                                             type="button"
@@ -188,8 +190,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
 
                             {/* Error message */}
                             {error && (
-                                <p className="text-rose-400 text-xs font-bold bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-2 animate-[slideIn_0.3s_ease-out]">
-                                    {error}
+                                <p className="text-rose-400 text-xs font-bold bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-2.5 animate-[slideIn_0.3s_ease-out]">
+                                    ⚠ {error}
                                 </p>
                             )}
 
@@ -199,17 +201,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
                                 disabled={isLoading}
                                 className="relative w-full py-4 rounded-xl text-white font-extrabold text-sm tracking-wide transition-all duration-300 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden group"
                             >
-                                {/* Button gradient bg */}
                                 <div className="absolute inset-0 bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-600 bg-[length:200%_100%] group-hover:bg-[position:100%_0] transition-[background-position] duration-500" />
-
-                                {/* Glint across button */}
                                 <div className="absolute inset-0 overflow-hidden">
                                     <div className="glint-sweep-fast" />
                                 </div>
-
-                                {/* Button shadow */}
                                 <div className="absolute inset-0 shadow-xl shadow-teal-600/30 group-hover:shadow-teal-500/40 rounded-xl transition-shadow duration-300" />
-
                                 <span className="relative z-10 flex items-center justify-center gap-2">
                                     {isLoading ? (
                                         <>
@@ -227,14 +223,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onAuthenticated }) => {
                             </button>
                         </form>
 
-                        {/* Divider */}
                         <div className="flex items-center gap-3 mt-6">
                             <div className="flex-1 h-px bg-white/[0.06]" />
-                            <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">secured by AI</span>
+                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">secured by AI</span>
                             <div className="flex-1 h-px bg-white/[0.06]" />
                         </div>
-
-                        <p className="text-center text-[11px] text-slate-600 mt-4 font-medium">
+                        <p className="text-center text-[11px] text-slate-500 mt-4 font-medium">
                             Protected by enterprise-grade encryption
                         </p>
                     </div>
