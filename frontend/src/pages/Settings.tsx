@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Shield, Gauge, Key, Save, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, Shield, Gauge, Save } from 'lucide-react';
 import { toast } from '../utils/toast';
 import { api } from '../services/api';
 
@@ -11,9 +11,6 @@ export interface AppSettings {
     hbpUpcodingAnalysis: boolean;
     criticalRiskThreshold: number;
     highRiskThreshold: number;
-    groqApiKey: string;
-    megaLlmApiKey: string;
-    defaultAuditorModel: 'Llama-3.3-70b (Groq)' | 'GLM-4.7 (Mega LLM)';
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -22,9 +19,6 @@ const DEFAULT_SETTINGS: AppSettings = {
     hbpUpcodingAnalysis: true,
     criticalRiskThreshold: 65,
     highRiskThreshold: 40,
-    groqApiKey: '',
-    megaLlmApiKey: '',
-    defaultAuditorModel: 'Llama-3.3-70b (Groq)',
 };
 
 function loadFromStorage(): AppSettings {
@@ -40,8 +34,6 @@ function loadFromStorage(): AppSettings {
 
 export const Settings: React.FC = () => {
     const [settings, setSettings] = useState<AppSettings>(() => loadFromStorage());
-    const [showGroqKey, setShowGroqKey] = useState(false);
-    const [showMegaKey, setShowMegaKey] = useState(false);
 
     useEffect(() => {
         const local = loadFromStorage();
@@ -54,7 +46,6 @@ export const Settings: React.FC = () => {
                     hbpUpcodingAnalysis: server.hbpUpcodingAnalysis ?? local.hbpUpcodingAnalysis,
                     criticalRiskThreshold: Number(server.criticalRiskThreshold) || local.criticalRiskThreshold,
                     highRiskThreshold: Number(server.highRiskThreshold) || local.highRiskThreshold,
-                    defaultAuditorModel: (server.defaultAuditorModel as AppSettings['defaultAuditorModel']) || local.defaultAuditorModel,
                 });
             } else {
                 setSettings(local);
@@ -75,7 +66,6 @@ export const Settings: React.FC = () => {
                 hbpUpcodingAnalysis: settings.hbpUpcodingAnalysis,
                 criticalRiskThreshold: settings.criticalRiskThreshold,
                 highRiskThreshold: settings.highRiskThreshold,
-                defaultAuditorModel: settings.defaultAuditorModel,
             });
             toast.success('Configuration saved successfully.');
         } catch (e) {
@@ -100,7 +90,7 @@ export const Settings: React.FC = () => {
                             System Settings
                         </h1>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            NAFU Admin — Fraud rules, risk thresholds & AI configuration
+                            NAFU Admin — Fraud rules & risk thresholds
                         </p>
                     </div>
                 </div>
@@ -163,74 +153,12 @@ export const Settings: React.FC = () => {
                     </div>
                 </section>
 
-                {/* Section 3: AI & LLM Routing */}
-                <section className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 bg-gradient-to-r from-[#FF9933]/10 via-white to-[#138808]/10 dark:from-[#FF9933]/20 dark:via-slate-800 dark:to-[#138808]/20 border-b border-slate-200 dark:border-slate-700">
-                        <h2 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                            <Key size={20} className="text-[#138808]" />
-                            AI & LLM Routing Configuration
-                        </h2>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">API keys are stored locally and never sent to the server.</p>
-                    </div>
-                    <div className="p-6 space-y-5">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Groq API Key</label>
-                            <div className="relative">
-                                <input
-                                    type={showGroqKey ? 'text' : 'password'}
-                                    value={settings.groqApiKey}
-                                    onChange={(e) => update('groqApiKey', e.target.value)}
-                                    placeholder="••••••••••••••••••••"
-                                    className="w-full px-4 py-2.5 pr-12 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#138808]/50 focus:border-[#138808]"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowGroqKey((s) => !s)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                                >
-                                    {showGroqKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Mega LLM (GLM-4.7) API Key</label>
-                            <div className="relative">
-                                <input
-                                    type={showMegaKey ? 'text' : 'password'}
-                                    value={settings.megaLlmApiKey}
-                                    onChange={(e) => update('megaLlmApiKey', e.target.value)}
-                                    placeholder="••••••••••••••••••••"
-                                    className="w-full px-4 py-2.5 pr-12 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#138808]/50 focus:border-[#138808]"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowMegaKey((s) => !s)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                                >
-                                    {showMegaKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Default Clinical Auditor Model</label>
-                            <select
-                                value={settings.defaultAuditorModel}
-                                onChange={(e) => update('defaultAuditorModel', e.target.value as AppSettings['defaultAuditorModel'])}
-                                className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#138808]/50 focus:border-[#138808]"
-                            >
-                                <option value="Llama-3.3-70b (Groq)">Llama-3.3-70b (Groq)</option>
-                                <option value="GLM-4.7 (Mega LLM)">GLM-4.7 (Mega LLM)</option>
-                            </select>
-                        </div>
-                    </div>
-                </section>
-
                 {/* Save button */}
                 <div className="flex justify-end">
                     <button
                         type="button"
                         onClick={handleSave}
-                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-gradient-to-r from-[#FF9933] to-[#138808] hover:opacity-90 shadow-lg shadow-[#138808]/25 transition-all"
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-700 transition-all"
                     >
                         <Save size={20} />
                         Save Configuration
