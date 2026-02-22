@@ -41,6 +41,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange }) => {
                 <NavItem icon={<AlertCircle size={20} />} label="Alert Queue" active={currentView === 'queue'} badge="12" onClick={() => onViewChange('queue')} />
                 <NavItem icon={<Briefcase size={20} />} label="Case Manager" active={currentView === 'case_manager'} onClick={() => onViewChange('case_manager')} />
                 <NavItem icon={<Activity size={20} />} label="Typology Studio" active={currentView === 'typology'} onClick={() => onViewChange('typology')} />
+                <NavItem
+                    icon={<span className="text-base leading-none">🇮🇳</span>}
+                    label="AB-PMJAY Portal"
+                    active={currentView === 'ayushman_portal'}
+                    onClick={() => onViewChange('ayushman_portal')}
+                    highlight="saffron"
+                />
             </nav>
 
             <div className="p-4 mt-auto border-t border-slate-200 dark:border-slate-700 relative z-10 bg-slate-50/80 dark:bg-slate-800/80 backdrop-blur-md">
@@ -68,14 +75,19 @@ interface NavItemProps {
     active?: boolean;
     badge?: string;
     onClick: () => void;
+    highlight?: 'saffron';
 }
 
-const NavItem: React.FC<NavItemProps> = ({ icon, label, active, badge, onClick }) => (
+const NavItem: React.FC<NavItemProps> = ({ icon, label, active, badge, onClick, highlight }) => (
     <button
         onClick={onClick}
-        className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${active
-            ? 'bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/30 dark:to-cyan-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700 shadow-sm hover:shadow-md'
-            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 hover:text-slate-700 dark:hover:text-slate-200 border border-transparent hover:border-slate-200 dark:hover:border-slate-600'
+        className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${active && highlight === 'saffron'
+            ? 'bg-gradient-to-r from-[#FF9933]/20 via-white to-[#138808]/20 dark:from-[#FF9933]/25 dark:via-slate-800 dark:to-[#138808]/25 text-slate-800 dark:text-white border border-[#138808]/40 dark:border-[#138808]/50 shadow-sm hover:shadow-md'
+            : highlight === 'saffron'
+                ? 'text-slate-600 dark:text-slate-300 hover:bg-gradient-to-r hover:from-[#FF9933]/10 hover:to-[#138808]/10 dark:hover:from-[#FF9933]/15 dark:hover:to-[#138808]/15 border border-transparent hover:border-[#138808]/30'
+                : active
+                    ? 'bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/30 dark:to-cyan-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700 shadow-sm hover:shadow-md'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-slate-700/80 hover:text-slate-700 dark:hover:text-slate-200 border border-transparent hover:border-slate-200 dark:hover:border-slate-600'
             }`}
     >
         <div className="flex items-center gap-3">

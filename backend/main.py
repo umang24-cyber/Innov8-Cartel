@@ -226,6 +226,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Ayushman Bharat PM-JAY Router ──────────────────────────────────────────
+from routers.pmjay import router as pmjay_router
+app.include_router(pmjay_router, prefix="/api/ayushman", tags=["Ayushman PM-JAY"])
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Pydantic models — request and response schemas
