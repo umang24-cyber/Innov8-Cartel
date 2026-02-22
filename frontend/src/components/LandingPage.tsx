@@ -139,7 +139,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                         {/* Bouncy Logo */}
                         <div className="flex items-center justify-center gap-5 mb-5">
                             <div className="relative animate-[logoFloat_3s_ease-in-out_infinite]">
-                                <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-2xl shadow-teal-500/30 animate-[logoPulse_2s_ease-in-out_infinite] overflow-hidden">
+                                <div className="w-32 h-32 rounded-2xl flex items-center justify-center shadow-2xl shadow-teal-500/30 animate-[logoPulse_2s_ease-in-out_infinite] overflow-hidden">
                                     <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-full h-full object-contain drop-shadow-lg" />
                                 </div>
                                 <div className="absolute inset-0 rounded-2xl overflow-hidden">
@@ -162,12 +162,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                         </div>
 
                         {/* Main Quote */}
-                        <div className="overflow-hidden mb-8">
+                        <div className="overflow-hidden mb-8 max-w-5xl mx-auto">
                             <h2
-                                className={`text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-200 tracking-tight transition-all duration-1000 delay-300 ease-out ${heroVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}
-                                style={{ lineHeight: '1.2', filter: 'drop-shadow(0 2px 8px rgba(20,184,166,0.3))' }}
+                                className={`text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-200 tracking-tight transition-all duration-1000 delay-300 ease-out ${heroVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}
+                                style={{ lineHeight: '1.3', filter: 'drop-shadow(0 2px 8px rgba(20,184,166,0.3))' }}
                             >
-                                "Where Every Claim Meets the Truth."
+                                "Where Every Claim<br />Meets the Truth."
                             </h2>
                         </div>
 
