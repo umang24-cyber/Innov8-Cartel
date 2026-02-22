@@ -84,3 +84,65 @@
 .slide-in-right {
   animation: slideInRight 0.3s ease-out;
 }
+
+/* Glint / Shine sweep effects */
+@keyframes glintSweep {
+  0% { transform: translateX(-100%) rotate(25deg); }
+  100% { transform: translateX(400%) rotate(25deg); }
+}
+
+.glint-sweep {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 60%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 45%,
+    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0.15) 55%,
+    transparent 100%
+  );
+  animation: glintSweep 3s ease-in-out infinite;
+  animation-delay: 1s;
+  pointer-events: none;
+}
+
+.glint-sweep-slow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 40%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 45%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 55%,
+    transparent 100%
+  );
+  animation: glintSweep 6s ease-in-out infinite;
+  animation-delay: 2s;
+  pointer-events: none;
+}
+
+.glint-sweep-fast {
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 45%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.12) 55%,
+    transparent 100%
+  );
+  animation: glintSweep 2.5s ease-in-out infinite;
+  pointer-events: none;
+}

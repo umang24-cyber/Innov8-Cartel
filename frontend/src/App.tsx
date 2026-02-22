@@ -10,6 +10,7 @@ import { CaseManager } from './pages/CaseManager';
 import { NewClaimPage } from './pages/NewClaimPage';
 import { AyushmanPortal } from './pages/AyushmanPortal';
 import { Prologue } from './components/Prologue';
+import { LoginPage } from './components/LoginPage';
 import type { Claim, ViewState } from './types';
 import { api } from './services/api';
 import { Loader2, Activity, RefreshCw, Moon, Sun, Bell } from 'lucide-react';
@@ -27,6 +28,9 @@ function App() {
     const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showLogin, setShowLogin] = useState(() => {
+        return !sessionStorage.getItem('vericlaim_authenticated');
+    });
     const [showPrologue, setShowPrologue] = useState(() => {
         return !sessionStorage.getItem('vericlaim_prologue_seen');
     });
@@ -157,8 +161,17 @@ function App() {
     const investigatingClaims = claims.filter(c => c.status === 'Investigating');
     const totalFlagged = claims.filter(c => c.riskScore !== undefined && c.riskScore > 40).length;
 
+    const handleLoginComplete = () => {
+        sessionStorage.setItem('vericlaim_authenticated', 'true');
+        setShowLogin(false);
+    };
+
     if (showPrologue) {
         return <Prologue onComplete={handlePrologueComplete} />;
+    }
+
+    if (showLogin) {
+        return <LoginPage onAuthenticated={handleLoginComplete} />;
     }
 
     return (
