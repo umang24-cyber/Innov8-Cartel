@@ -329,7 +329,7 @@ function App() {
                 </header>
 
                 {/* Main Content Area with smooth transitions */}
-                <div className={`flex-1 overflow-hidden p-6 relative z-10 transition-all duration-300 ease-in-out ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
+                <div className={`flex-1 overflow-y-auto p-6 relative z-10 transition-all duration-300 ease-in-out ${isTransitioning ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
                     {error && (
                         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-100/80 dark:bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-300">
                             <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-red-100 dark:border-red-900 max-w-md text-center transform animate-in zoom-in-95 duration-300">
