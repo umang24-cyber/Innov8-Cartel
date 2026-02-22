@@ -461,6 +461,10 @@ def analyze_with_groq(claim: "ClaimRequest", risk_score: int, shap_text: str) ->
     # Retrieve diagnosis-specific stats for context
     stats = DIAG_STATS.get(claim.Diagnosis_Code, DEFAULT_STATS)
 
+    # Generate a unique audit ID per call to ensure varied LLM outputs
+    import uuid
+    audit_id = str(uuid.uuid4())[:8].upper()
+
     # The system prompt defines the AI's persona and constraints.
     # Being specific ("senior medical billing auditor") produces much better
     # output than a generic "helpful assistant" prompt.
@@ -492,6 +496,7 @@ Your task:
 2. Are there any contradictions between the note content and the billing?
 3. What specific red flags (if any) should a human investigator examine?
 
+Audit reference: {audit_id}
 Respond in exactly 3 sentences. Be specific about amounts, codes, and clinical reasoning."""
 
     try:
@@ -501,7 +506,7 @@ Respond in exactly 3 sentences. Be specific about amounts, codes, and clinical r
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
             ],
-            temperature=0.1,      # very low → factual, consistent, reproducible
+            temperature=0.72,     # higher → varied, unique outputs per call
             max_tokens=250,       # enforce brevity for the UI panel
         )
         
