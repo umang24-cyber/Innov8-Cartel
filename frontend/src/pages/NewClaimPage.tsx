@@ -19,6 +19,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim:
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [isHumanInvestigatorAssigned, setIsHumanInvestigatorAssigned] = useState(false);
 
     const diagnosisCodes = [
         { code: 'J06.9', label: 'Acute Upper Respiratory Infection' },
@@ -59,6 +60,11 @@ export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim:
             return;
         }
 
+        if (formData.Procedure_Code === 'OTHER' || formData.Diagnosis_Code === 'OTHER') {
+            setIsHumanInvestigatorAssigned(true);
+            return;
+        }
+
         setIsAnalyzing(true);
         try {
             const claimPayload: Claim = {
@@ -87,6 +93,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim:
         setResult(null);
         setError(null);
         setSaveSuccess(false);
+        setIsHumanInvestigatorAssigned(false);
     };
 
     const handleSave = async (e: React.FormEvent) => {
@@ -144,6 +151,10 @@ export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim:
         ? result.risk_score > 70 ? 'rose' : result.risk_score > 40 ? 'amber' : 'teal'
         : 'slate';
 
+    const handleExportPDF = () => {
+        window.print();
+    };
+
     return (
         <div className="h-full overflow-y-auto pb-8 pr-2">
             <div className="max-w-5xl mx-auto space-y-6">
@@ -158,7 +169,7 @@ export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim:
 
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     {/* Form Section */}
-                    <form onSubmit={handleSubmit} className="lg:col-span-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm space-y-5">
+                    <form onSubmit={handleSubmit} className="print:hidden lg:col-span-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm space-y-5">
                         <h3 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 uppercase tracking-widest mb-1">Claim Fields</h3>
 
                         {/* Provider ID */}
@@ -288,8 +299,8 @@ export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim:
                     </form>
 
                     {/* Results Section */}
-                    <div className="lg:col-span-3 space-y-5">
-                        {!result && !isAnalyzing && (
+                    <div className="lg:col-span-3 space-y-5 print:w-full print:block">
+                        {!result && !isAnalyzing && !isHumanInvestigatorAssigned && (
                             <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl p-12 shadow-sm flex flex-col items-center justify-center text-center h-full min-h-[400px]">
                                 <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-2xl flex items-center justify-center mb-4">
                                     <FileText className="w-10 h-10 text-slate-400" />
@@ -307,11 +318,27 @@ export const NewClaimPage: React.FC<{ userEmail?: string; onClaimSaved?: (claim:
                             </div>
                         )}
 
+                        {isHumanInvestigatorAssigned && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-12 shadow-sm flex flex-col items-center justify-center text-center h-full min-h-[400px]">
+                                <AlertTriangle className="w-16 h-16 text-amber-500 mb-4" />
+                                <h3 className="text-xl font-bold text-amber-800 dark:text-amber-200 mb-4">Manual Review Required</h3>
+                                <p className="text-lg text-amber-700 dark:text-amber-300 max-w-md font-medium">
+                                    due to insufficient resources you will be allotted a human investigator, you can contact him at +91 87541 xxxxx
+                                </p>
+                            </div>
+                        )}
+
                         {result && (
                             <div className="space-y-5">
                                 {/* Risk Score Card */}
-                                <div className={`bg-${riskColor}-50 dark:bg-${riskColor}-900/20 border border-${riskColor}-200 dark:border-${riskColor}-800 rounded-2xl p-6 shadow-sm`}>
-                                    <div className="flex items-center justify-between">
+                                <div className={`bg-${riskColor}-50 dark:bg-${riskColor}-900/20 border border-${riskColor}-200 dark:border-${riskColor}-800 rounded-2xl p-6 shadow-sm relative`}>
+                                    <button
+                                        onClick={handleExportPDF}
+                                        className="print:hidden absolute top-4 right-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                                    >
+                                        <FileText size={14} /> Export PDF
+                                    </button>
+                                    <div className="flex items-center justify-between mt-2">
                                         <div>
                                             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Risk Assessment</p>
                                             <div className="flex items-baseline gap-3">

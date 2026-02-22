@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, Shield, AlertTriangle } from 'lucide-react';
+import { Loader2, Shield, AlertTriangle, FileText } from 'lucide-react';
 import { AyushmanBadge } from '../components/AyushmanBadge';
 
 const API_BASE = 'http://localhost:8000';
@@ -23,6 +23,7 @@ export const AyushmanPortal: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [result, setResult] = useState<AyushmanAuditResult | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isHumanInvestigatorAssigned, setIsHumanInvestigatorAssigned] = useState(false);
 
     const diagnosisCodes = [
         { code: 'J06.9', label: 'Acute Upper Respiratory Infection' },
@@ -56,6 +57,13 @@ export const AyushmanPortal: React.FC = () => {
         e.preventDefault();
         setError(null);
         setResult(null);
+        setIsHumanInvestigatorAssigned(false);
+
+        if (formData.Procedure_Code === 'OTHER' || formData.Diagnosis_Code === 'OTHER') {
+            setIsHumanInvestigatorAssigned(true);
+            return;
+        }
+
         setIsLoading(true);
 
         try {
@@ -86,6 +94,10 @@ export const AyushmanPortal: React.FC = () => {
         }
     };
 
+    const handleExportPDF = () => {
+        window.print();
+    };
+
     return (
         <div className="h-full overflow-y-auto flex flex-col pb-8">
             {/* Header - Govt portal style */}
@@ -108,7 +120,7 @@ export const AyushmanPortal: React.FC = () => {
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="print:hidden space-y-6">
                 {/* Form card */}
                 <div className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
                     <div className="px-6 py-4 bg-gradient-to-r from-[#FF9933]/10 via-white to-[#138808]/10 dark:from-[#FF9933]/20 dark:via-slate-800 dark:to-[#138808]/20 border-b border-slate-200 dark:border-slate-700">
@@ -214,8 +226,24 @@ export const AyushmanPortal: React.FC = () => {
                 </div>
             )}
 
+            {isHumanInvestigatorAssigned && (
+                <div className="mt-6 p-12 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 flex flex-col items-center justify-center text-center">
+                    <AlertTriangle className="w-16 h-16 text-amber-500 mb-4" />
+                    <h3 className="text-xl font-bold text-amber-800 dark:text-amber-200 mb-4">Manual Review Required</h3>
+                    <p className="text-lg text-amber-700 dark:text-amber-300 max-w-md font-medium">
+                        due to insufficient resources you will be allotted a human investigator, you can contact him at +91 87541 xxxxx
+                    </p>
+                </div>
+            )}
+
             {result && (
-                <div className="mt-6 space-y-4">
+                <div className="mt-6 space-y-4 print:w-full print:block relative">
+                    <button
+                        onClick={handleExportPDF}
+                        className="print:hidden absolute top-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-colors shadow-sm z-10"
+                    >
+                        <FileText size={16} /> Export PDF
+                    </button>
                     <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
                         <Shield size={18} className="text-[#138808]" />
                         NAFU Audit Results
@@ -227,14 +255,14 @@ export const AyushmanPortal: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Risk Score:</span>
                                 <span className={`px-3 py-1 rounded-lg font-bold text-lg ${result.risk_label === 'CRITICAL' ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' :
-                                        result.risk_label === 'HIGH' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
-                                            'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                    result.risk_label === 'HIGH' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
+                                        'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
                                     }`}>
                                     {result.risk_score}/100
                                 </span>
                                 <span className={`text-sm font-bold px-2 py-0.5 rounded ${result.risk_label === 'CRITICAL' ? 'bg-rose-200/60 dark:bg-rose-800/40 text-rose-800 dark:text-rose-200' :
-                                        result.risk_label === 'HIGH' ? 'bg-amber-200/60 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200' :
-                                            'bg-emerald-200/60 dark:bg-emerald-800/40 text-emerald-800 dark:text-emerald-200'
+                                    result.risk_label === 'HIGH' ? 'bg-amber-200/60 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200' :
+                                        'bg-emerald-200/60 dark:bg-emerald-800/40 text-emerald-800 dark:text-emerald-200'
                                     }`}>
                                     {result.risk_label}
                                 </span>
