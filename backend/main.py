@@ -696,10 +696,14 @@ async def analyze_batch(file: UploadFile = File(...)):
         contents = await file.read()
         df = pd.read_csv(io.BytesIO(contents))
         
-        # 2. Validate that the required columns exist
-        missing_cols = [col for col in ALL_FEATURES if col not in df.columns]
+        # 2. Validate that the required columns exist (PMJAY_Package_Code is optional)
+        required_cols = [c for c in ALL_FEATURES if c != "PMJAY_Package_Code"]
+        missing_cols = [col for col in required_cols if col not in df.columns]
         if missing_cols:
             raise HTTPException(status_code=400, detail=f"CSV missing required columns: {missing_cols}")
+        # Default PMJAY_Package_Code if not provided
+        if "PMJAY_Package_Code" not in df.columns:
+            df["PMJAY_Package_Code"] = "BM001A"
 
         # 3. Transform the data using your ML pipeline's preprocessor
         preprocessor = app_state.pipeline.named_steps["preprocessor"]

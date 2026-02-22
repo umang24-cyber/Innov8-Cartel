@@ -258,8 +258,8 @@ export const NewClaimPage: React.FC<NewClaimPageProps> = ({ userEmail, onClaimSa
                     <button
                         onClick={() => setActiveTab('individual')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'individual'
-                                ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-md'
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                            ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-md'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
                     >
                         <FileText size={16} /> Individual Claim
@@ -267,8 +267,8 @@ export const NewClaimPage: React.FC<NewClaimPageProps> = ({ userEmail, onClaimSa
                     <button
                         onClick={() => setActiveTab('batch')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-all duration-200 ${activeTab === 'batch'
-                                ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-md'
-                                : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                            ? 'bg-white dark:bg-slate-700 text-teal-700 dark:text-teal-300 shadow-md'
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
                     >
                         <FileSpreadsheet size={16} /> Batch Upload
@@ -548,10 +548,10 @@ export const NewClaimPage: React.FC<NewClaimPageProps> = ({ userEmail, onClaimSa
                                     onDrop={handleDrop}
                                     onClick={() => fileInputRef.current?.click()}
                                     className={`relative cursor-pointer border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center transition-all duration-200 ${isDragOver
-                                            ? 'border-teal-500 bg-teal-50/50 dark:bg-teal-900/10 scale-[1.01]'
-                                            : batchFile
-                                                ? 'border-teal-400 bg-teal-50/30 dark:bg-teal-900/10'
-                                                : 'border-slate-300 dark:border-slate-600 hover:border-teal-400 hover:bg-slate-50/50 dark:hover:bg-slate-700/30'
+                                        ? 'border-teal-500 bg-teal-50/50 dark:bg-teal-900/10 scale-[1.01]'
+                                        : batchFile
+                                            ? 'border-teal-400 bg-teal-50/30 dark:bg-teal-900/10'
+                                            : 'border-slate-300 dark:border-slate-600 hover:border-teal-400 hover:bg-slate-50/50 dark:hover:bg-slate-700/30'
                                         }`}
                                 >
                                     <input
@@ -585,7 +585,7 @@ export const NewClaimPage: React.FC<NewClaimPageProps> = ({ userEmail, onClaimSa
                                 <div className="bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl p-4">
                                     <p className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-2">Required CSV Columns</p>
                                     <div className="flex flex-wrap gap-2">
-                                        {['Provider_ID', 'PMJAY_Package_Code', 'Diagnosis_Code', 'Procedure_Code', 'Total_Claim_Amount'].map(col => (
+                                        {['Provider_ID', 'Diagnosis_Code', 'Procedure_Code', 'Total_Claim_Amount'].map(col => (
                                             <span key={col} className="px-2.5 py-1 bg-white dark:bg-slate-600 border border-slate-200 dark:border-slate-500 rounded-lg text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
                                                 {col}
                                             </span>
@@ -721,8 +721,8 @@ export const NewClaimPage: React.FC<NewClaimPageProps> = ({ userEmail, onClaimSa
                                                             <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-700 dark:text-slate-300">₹{Number(claim.Total_Claim_Amount).toLocaleString('en-IN')}</td>
                                                             <td className="py-2.5 px-4 text-center">
                                                                 <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${claim.Risk_Label === 'HIGH' ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'
-                                                                        : claim.Risk_Label === 'MEDIUM' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-                                                                            : 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
+                                                                    : claim.Risk_Label === 'MEDIUM' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                                                                        : 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300'
                                                                     }`}>
                                                                     {claim.Risk_Score}/100
                                                                 </span>
