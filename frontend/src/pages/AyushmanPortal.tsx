@@ -5,11 +5,10 @@ import { AyushmanBadge } from '../components/AyushmanBadge';
 const API_BASE = 'http://localhost:8000';
 
 export interface AyushmanAuditResult {
-    bis_verified: boolean;
-    wallet_depletion_flag: boolean;
+    abha_verified: boolean;
     risk_score: number;
-    clinical_findings: string;
-    advisory_note: string;
+    risk_label: string;
+    nafu_audit_finding: string;
 }
 
 export const AyushmanPortal: React.FC = () => {
@@ -17,7 +16,7 @@ export const AyushmanPortal: React.FC = () => {
         ABHA_ID: '91-4567-8912-3456',
         PMJAY_Package_Code: 'BM001A',
         Diagnosis_Code: 'J06.9',
-        Procedure_Code: '',
+        Procedure_Code: '99214',
         Total_Claim_Amount: '37400',
         Unstructured_Notes: 'Patient presented with mild throat pain. Admitted to IPD for 3 days.',
     });
@@ -39,7 +38,7 @@ export const AyushmanPortal: React.FC = () => {
                     ABHA_ID: formData.ABHA_ID,
                     PMJAY_Package_Code: formData.PMJAY_Package_Code,
                     Diagnosis_Code: formData.Diagnosis_Code,
-                    Procedure_Code: formData.Procedure_Code || '99214',
+                    Procedure_Code: formData.Procedure_Code || '',
                     Total_Claim_Amount: parseFloat(formData.Total_Claim_Amount),
                     Unstructured_Notes: formData.Unstructured_Notes,
                 }),
@@ -74,7 +73,7 @@ export const AyushmanPortal: React.FC = () => {
                     </h1>
                 </div>
                 <h2 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FF9933] via-slate-700 to-[#138808] dark:from-[#FF9933] dark:via-slate-300 dark:to-[#138808]">
-                    TMS Pre-Authorization Portal
+                    TMS Pre-Authorization
                 </h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                     Ayushman Bharat PM-JAY • ₹5 Lakh Family Floater Protection
@@ -115,6 +114,16 @@ export const AyushmanPortal: React.FC = () => {
                                 type="text"
                                 value={formData.Diagnosis_Code}
                                 onChange={(e) => setFormData({ ...formData, Diagnosis_Code: e.target.value })}
+                                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#138808]/50 focus:border-[#138808]"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Procedure Code</label>
+                            <input
+                                type="text"
+                                value={formData.Procedure_Code}
+                                onChange={(e) => setFormData({ ...formData, Procedure_Code: e.target.value })}
+                                placeholder="e.g. 99214"
                                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-[#138808]/50 focus:border-[#138808]"
                             />
                         </div>
@@ -179,30 +188,29 @@ export const AyushmanPortal: React.FC = () => {
 
                     <div className="bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm overflow-hidden">
                         <div className="px-6 py-4 bg-gradient-to-r from-[#FF9933]/5 via-slate-50 to-[#138808]/5 dark:from-[#FF9933]/10 dark:via-slate-800 dark:to-[#138808]/10 border-b border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-4">
-                            <AyushmanBadge isVerified={result.bis_verified} abhaId={formData.ABHA_ID} />
+                            <AyushmanBadge isVerified={result.abha_verified} abhaId={formData.ABHA_ID} />
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">Risk Score:</span>
-                                <span className={`px-3 py-1 rounded-lg font-bold text-lg ${result.risk_score >= 60 ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' :
-                                        result.risk_score >= 30 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
-                                            'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                                    }`}>
+                                <span className={`px-3 py-1 rounded-lg font-bold text-lg ${
+                                    result.risk_label === 'CRITICAL' ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300' :
+                                    result.risk_label === 'HIGH' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
+                                    'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                }`}>
                                     {result.risk_score}/100
                                 </span>
+                                <span className={`text-sm font-bold px-2 py-0.5 rounded ${
+                                    result.risk_label === 'CRITICAL' ? 'bg-rose-200/60 dark:bg-rose-800/40 text-rose-800 dark:text-rose-200' :
+                                    result.risk_label === 'HIGH' ? 'bg-amber-200/60 dark:bg-amber-800/40 text-amber-800 dark:text-amber-200' :
+                                    'bg-emerald-200/60 dark:bg-emerald-800/40 text-emerald-800 dark:text-emerald-200'
+                                }`}>
+                                    {result.risk_label}
+                                </span>
                             </div>
-                            {result.wallet_depletion_flag && (
-                                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700">
-                                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                                    <span className="text-sm font-bold text-amber-800 dark:text-amber-200">⚠️ Wallet Depletion Risk — Claim exceeds ₹5 Lakh limit</span>
-                                </div>
-                            )}
                         </div>
                         <div className="p-6 space-y-4">
-                            <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-600">
-                                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">NAFU Clinical Findings</h4>
-                                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{result.clinical_findings}</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-amber-50/80 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
-                                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">{result.advisory_note}</p>
+                            <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 border-l-4 border-[#138808] dark:border-[#138808] shadow-sm">
+                                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wider">NAFU AI Audit Finding</h4>
+                                <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{result.nafu_audit_finding}</p>
                             </div>
                         </div>
                     </div>
