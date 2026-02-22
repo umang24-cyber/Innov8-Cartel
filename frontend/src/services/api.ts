@@ -285,4 +285,30 @@ export const api = {
             throw error;
         }
     },
+
+    // 10. Settings (NAFU admin)
+    getSettings: async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/settings`);
+            if (!res.ok) return null;
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            return null;
+        }
+    },
+    saveSettings: async (payload: Record<string, unknown>) => {
+        try {
+            const res = await fetch(`${API_BASE}/api/settings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error('Failed to save settings');
+            return await res.json();
+        } catch (error) {
+            console.error("API Error:", error);
+            throw error;
+        }
+    },
 };

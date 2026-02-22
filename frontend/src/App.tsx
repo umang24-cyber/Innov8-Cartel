@@ -9,6 +9,7 @@ import { TypologyStudio } from './pages/TypologyStudio';
 import { CaseManager } from './pages/CaseManager';
 import { NewClaimPage } from './pages/NewClaimPage';
 import { AyushmanPortal } from './pages/AyushmanPortal';
+import { Settings } from './pages/Settings';
 import { LandingPage } from './components/LandingPage';
 import { ProfileSettings } from './components/ProfileSettings';
 import type { Claim, ViewState } from './types';
@@ -357,11 +358,7 @@ function App() {
                     {currentView === 'new_claim' && <NewClaimPage userEmail={user?.email} onClaimSaved={handleClaimSaved} />}
                     {currentView === 'ayushman_portal' && <AyushmanPortal />}
 
-                    {currentView === 'settings' && (
-                        <div className="flex-1 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm flex flex-col items-center justify-center text-slate-400">
-                            <p className="font-bold text-lg text-slate-500 dark:text-slate-400">Settings coming soon</p>
-                        </div>
-                    )}
+                    {currentView === 'settings' && <Settings />}
                 </div>
             </main>
 

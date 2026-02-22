@@ -39,10 +39,22 @@ def _simulate_bis_ekyc(abha_id: str) -> bool:
     return normalized.startswith("91")
 
 
+def _get_risk_thresholds() -> tuple[int, int]:
+    """Read Critical and High thresholds from backend settings if available."""
+    try:
+        from main import app_settings_store
+        critical = int(app_settings_store.get("criticalRiskThreshold", 65))
+        high = int(app_settings_store.get("highRiskThreshold", 40))
+        return critical, high
+    except Exception:
+        return 65, 40
+
+
 def _rule_based_risk_engine(amount: float, notes: str) -> tuple[int, str]:
     """
     Rule-Based Risk Engine (NO ML MODEL).
     Base=15. Wallet>450k +45, >100k +25. OPD-to-IPD keywords +35. Cap at 98.
+    Risk labels use thresholds from admin settings.
     """
     risk_score = 15
 
@@ -57,9 +69,10 @@ def _rule_based_risk_engine(amount: float, notes: str) -> tuple[int, str]:
 
     risk_score = min(98, risk_score)
 
-    if risk_score >= 65:
+    critical_th, high_th = _get_risk_thresholds()
+    if risk_score >= critical_th:
         risk_label = "CRITICAL"
-    elif risk_score >= 40:
+    elif risk_score >= high_th:
         risk_label = "HIGH"
     else:
         risk_label = "LOW"
