@@ -37,7 +37,12 @@ export const Prologue: React.FC<PrologueProps> = ({ onComplete }) => {
             <div className={`absolute top-1/4 left-1/4 w-96 h-96 bg-teal-600/20 rounded-full blur-[100px] transition-all duration-3000 ease-in-out ${step >= 1 ? 'scale-150 opacity-100' : 'scale-50 opacity-0'}`} />
             <div className={`absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-600/20 rounded-full blur-[100px] transition-all duration-3000 delay-500 ease-in-out ${step >= 1 ? 'scale-125 opacity-100' : 'scale-50 opacity-0'}`} />
 
-            <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
+            {/* Logo Top Left */}
+            <div className={`absolute top-8 left-8 transition-opacity duration-1000 ${step >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                <img src="/assets/vericlaim-logo.png" alt="VeriClaim Logo" className="w-32 h-auto md:w-48 drop-shadow-2xl brightness-110" />
+            </div>
+
+            <div className="relative z-10 text-center px-6 max-w-4xl mx-auto mt-20">
                 {/* Main Quote */}
                 <div className="overflow-hidden mb-6">
                     <h1
@@ -73,8 +78,8 @@ export const Prologue: React.FC<PrologueProps> = ({ onComplete }) => {
 
             {/* Loading Progress Bar at bottom */}
             <div className={`absolute bottom-0 left-0 h-1.5 bg-gradient-to-r from-teal-500 to-cyan-400 transition-all ease-linear duraton-1000 ${step === 0 ? 'w-0' :
-                    step === 1 ? 'w-1/3 duration-[2000ms]' :
-                        step === 2 ? 'w-full duration-[3000ms]' : 'w-full opacity-0'
+                step === 1 ? 'w-1/3 duration-[2000ms]' :
+                    step === 2 ? 'w-full duration-[3000ms]' : 'w-full opacity-0'
                 }`} />
         </div>
     );

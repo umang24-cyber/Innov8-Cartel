@@ -21,7 +21,7 @@ export interface Claim {
     expected_std: number;
     z_score: number;
   };
-  status?: 'Pending' | 'Investigating' | 'Cleared' | 'Rejected';
+  status?: 'Pending' | 'Investigating' | 'Investigated' | 'Done' | 'Cleared' | 'Rejected';
 
   // New features: Anomaly Detection & Benford's Law
   anomalyScore?: number;

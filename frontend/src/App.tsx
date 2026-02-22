@@ -29,6 +29,7 @@ function App() {
     const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null);
     const [isLoadingInit, setIsLoadingInit] = useState(true);
     const [analyzingClaimId, setAnalyzingClaimId] = useState<string | null>(null);
+    const [isInvestigatingAll, setIsInvestigatingAll] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showNotifications, setShowNotifications] = useState(false);
     const [showProfileSettings, setShowProfileSettings] = useState(false);
@@ -112,7 +113,7 @@ function App() {
                         anomalyScore: result.anomaly_score,
                         benfordScore: result.benford_score,
                         benfordAnalysis: result.benford_analysis,
-                        status: result.risk_score > 60 ? 'Investigating' : 'Pending'
+                        status: 'Investigated'
                     }
                     : c
             ));
@@ -145,6 +146,29 @@ function App() {
         ));
         setSelectedClaimId(null);
         toast.info(`Claim ${id} cleared`);
+    };
+
+    // Investigate all unscored claims sequentially
+    const handleInvestigateAll = async () => {
+        const unscoredClaims = claims.filter(c => c.riskScore === undefined && c.status !== 'Done');
+        if (unscoredClaims.length === 0) {
+            toast.info('All claims have already been investigated');
+            return;
+        }
+        setIsInvestigatingAll(true);
+        for (const claim of unscoredClaims) {
+            await handleInvestigateClaim(claim.claim_id);
+        }
+        setIsInvestigatingAll(false);
+        toast.success(`All ${unscoredClaims.length} claims investigated`);
+    };
+
+    // Mark claim as done
+    const handleMarkDone = (id: string) => {
+        setClaims(prev => prev.map(c =>
+            c.claim_id === id ? { ...c, status: 'Done' as const } : c
+        ));
+        toast.success(`Claim ${id} marked as done`);
     };
 
     const selectedClaim = claims.find(c => c.claim_id === selectedClaimId) || null;
@@ -337,6 +361,9 @@ function App() {
                                     selectedClaimId={selectedClaimId}
                                     onSelectClaim={handleSelectClaim}
                                     isLoadingId={analyzingClaimId}
+                                    onInvestigateAll={handleInvestigateAll}
+                                    onMarkDone={handleMarkDone}
+                                    isInvestigatingAll={isInvestigatingAll}
                                 />
                             </div>
                             <div className={`transition-all duration-400 ease-in-out transform ${selectedClaimId ? 'translate-x-0 opacity-100 w-[400px]' : 'translate-x-8 opacity-0 w-0 overflow-hidden'}`}>
@@ -353,7 +380,7 @@ function App() {
                         </div>
                     )}
 
-                    {currentView === 'case_manager' && <CaseManager />}
+                    {currentView === 'case_manager' && <CaseManager investigatedClaims={claims.filter(c => c.status === 'Investigated' || c.status === 'Done')} />}
                     {currentView === 'typology' && <TypologyStudio />}
                     {currentView === 'new_claim' && <NewClaimPage userEmail={user?.email} onClaimSaved={handleClaimSaved} />}
                     {currentView === 'ayushman_portal' && <AyushmanPortal />}

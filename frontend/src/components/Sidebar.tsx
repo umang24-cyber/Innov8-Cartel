@@ -20,11 +20,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, user, onPr
             {/* Ambient background glow */}
             <div className="absolute top-0 left-0 w-full h-32 bg-teal-500/5 blur-3xl pointer-events-none"></div>
 
-            <div className="flex items-center px-6 mb-6 relative z-10 hover:scale-105 transition-transform cursor-pointer" onClick={() => onViewChange('overview')}>
-                <div className="mr-3 w-9 h-9 flex-shrink-0">
-                    <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-full h-full object-contain drop-shadow-md dark:brightness-110" />
+            <div className="flex flex-col items-start px-6 mb-8 mt-2 relative z-10 hover:scale-105 transition-transform cursor-pointer" onClick={() => onViewChange('overview')}>
+                <div className="mb-3 w-28 h-28 flex-shrink-0">
+                    <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-full h-full object-contain drop-shadow-lg dark:brightness-110" />
                 </div>
-                <h1 className="text-xl font-extrabold tracking-wide text-slate-800 dark:text-white flex items-center">
+                <h1 className="text-2xl font-extrabold tracking-wide text-slate-800 dark:text-white flex items-center">
                     Veri<span className="text-cyan-500 dark:text-cyan-400">Claim</span>
                 </h1>
             </div>

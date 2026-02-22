@@ -2,6 +2,7 @@ import React from 'react';
 import type { Claim } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { X, FileText, CheckCircle, ShieldAlert, HeartPulse, AlertTriangle, TrendingUp, Loader2 } from 'lucide-react';
+import { formatCurrency } from '../utils/format';
 
 interface ExplainabilityPanelProps {
     claim: Claim | null;
@@ -71,7 +72,7 @@ const ExplainabilityPanel: React.FC<ExplainabilityPanelProps> = ({ claim, onClos
                         </div>
                         <div>
                             <p className="text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-wider mb-0.5">Amt Billed</p>
-                            <p className="text-teal-700 dark:text-teal-400 font-extrabold">${claim.Total_Claim_Amount.toLocaleString()}</p>
+                            <p className="text-teal-700 dark:text-teal-400 font-extrabold">{formatCurrency(claim.Total_Claim_Amount)}</p>
                         </div>
                         <div>
                             <p className="text-slate-500 dark:text-slate-400 text-[10px] uppercase tracking-wider mb-0.5">Diag Code</p>

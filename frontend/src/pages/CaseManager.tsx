@@ -10,7 +10,11 @@ import { toast } from '../utils/toast';
 import { formatDate, formatRelativeTime } from '../utils/format';
 import { formatCurrency } from '../utils/format';
 
-export const CaseManager: React.FC = () => {
+interface CaseManagerProps {
+  investigatedClaims?: Claim[];
+}
+
+export const CaseManager: React.FC<CaseManagerProps> = ({ investigatedClaims = [] }) => {
   const [cases, setCases] = useState<Case[]>([]);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +38,32 @@ export const CaseManager: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Build synthetic cases from investigated claims that are not already in the API cases
+  const investigatedCases: Case[] = investigatedClaims
+    .filter(claim => !cases.some(c => c.claim_id === claim.claim_id))
+    .map(claim => ({
+      id: `case-${claim.claim_id}`,
+      claim_id: claim.claim_id,
+      claim: claim,
+      status: claim.status === 'Done' ? 'Closed' as const : 'Investigating' as const,
+      assignedTo: undefined,
+      priority: (claim.riskLevel === 'Critical' ? 'Critical' :
+        claim.riskLevel === 'High' ? 'High' :
+          claim.riskLevel === 'Medium' ? 'Medium' : 'Low') as Case['priority'],
+      notes: [],
+      timeline: [{
+        id: `tl-${claim.claim_id}-1`,
+        type: 'status_change' as const,
+        actor: 'VeriClaim AI',
+        description: `Claim ${claim.claim_id} investigated via Alert Queue (Risk: ${claim.riskScore}/100)`,
+        timestamp: new Date().toISOString(),
+      }],
+      createdAt: claim.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+
+  const allCases = [...cases, ...investigatedCases];
 
   const handleUpdateCase = async (updates: Partial<Case>) => {
     if (!selectedCase) return;
@@ -83,19 +113,19 @@ export const CaseManager: React.FC = () => {
         <div className="p-6 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Cases</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {cases.length} active cases
+            {allCases.length} active cases
           </p>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {isLoading ? (
             [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} height={100} className="mb-2" />)
-          ) : cases.length === 0 ? (
+          ) : allCases.length === 0 ? (
             <EmptyState
               title="No cases found"
               description="Cases will appear here when claims are flagged"
             />
           ) : (
-            cases.map((c) => (
+            allCases.map((c) => (
               <div
                 key={c.id}
                 onClick={() => setSelectedCase(c)}
