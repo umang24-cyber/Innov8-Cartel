@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShieldCheck, Mail, Lock, Eye, EyeOff, ArrowRight, Sparkles, Activity, Brain, Layers, BarChart3, ChevronDown, Fingerprint, Search, FileText, X, LogIn } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Sparkles, Activity, Brain, Layers, BarChart3, ChevronDown, Fingerprint, Search, FileText, X, LogIn } from 'lucide-react';
 
 interface LandingPageProps {
     onSignUp: (email: string, password: string) => { success: boolean; error?: string };
@@ -98,9 +98,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
             {/* ── FIXED TOP NAV BAR ── */}
             <nav className={`fixed top-0 left-0 right-0 z-[9999] flex items-center justify-between px-8 py-4 transition-all duration-500 ${scrolled ? 'bg-slate-950/80 backdrop-blur-xl border-b border-white/[0.06] shadow-lg' : 'bg-transparent'}`}>
                 <div className="flex items-center gap-3 cursor-pointer" onClick={scrollToTop}>
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-500/20 animate-[logoFloat_3s_ease-in-out_infinite]">
-                        <ShieldCheck className="w-5 h-5 text-white" />
-                    </div>
+                    <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-9 h-9 object-contain drop-shadow-lg animate-[logoFloat_3s_ease-in-out_infinite]" />
                     <span className="text-lg font-black text-white tracking-tight" style={subtleShadow}>
                         Veri<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">Claim</span>
                     </span>
@@ -139,10 +137,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                     <div className={`text-center max-w-4xl mx-auto transition-all duration-1000 ease-out ${heroVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}>
 
                         {/* Bouncy Logo */}
-                        <div className="flex items-center justify-center gap-4 mb-5">
+                        <div className="flex items-center justify-center gap-5 mb-5">
                             <div className="relative animate-[logoFloat_3s_ease-in-out_infinite]">
-                                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-2xl shadow-teal-500/30 animate-[logoPulse_2s_ease-in-out_infinite]">
-                                    <ShieldCheck className="w-10 h-10 text-white drop-shadow-lg" />
+                                <div className="w-24 h-24 rounded-2xl flex items-center justify-center shadow-2xl shadow-teal-500/30 animate-[logoPulse_2s_ease-in-out_infinite] overflow-hidden">
+                                    <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-full h-full object-contain drop-shadow-lg" />
                                 </div>
                                 <div className="absolute inset-0 rounded-2xl overflow-hidden">
                                     <div className="glint-sweep" />
@@ -169,7 +167,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSignUp, onLogin }) =
                                 className={`text-5xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-200 tracking-tight transition-all duration-1000 delay-300 ease-out ${heroVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}
                                 style={{ lineHeight: '1.2', filter: 'drop-shadow(0 2px 8px rgba(20,184,166,0.3))' }}
                             >
-                                "Claiming ain't gonna cut it."
+                                "Where Every Claim Meets the Truth."
                             </h2>
                         </div>
 

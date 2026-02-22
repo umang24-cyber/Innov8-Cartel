@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, AlertCircle, Briefcase, Activity, Settings, ShieldPlus, Plus } from 'lucide-react';
+import { LayoutDashboard, AlertCircle, Briefcase, Activity, Settings, Plus } from 'lucide-react';
 import type { ViewState } from '../types';
 import type { UserProfile } from '../hooks/useAuth';
 
@@ -21,8 +21,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onViewChange, user, onPr
             <div className="absolute top-0 left-0 w-full h-32 bg-teal-500/5 blur-3xl pointer-events-none"></div>
 
             <div className="flex items-center px-6 mb-6 relative z-10 hover:scale-105 transition-transform cursor-pointer" onClick={() => onViewChange('overview')}>
-                <div className="bg-gradient-to-br from-teal-500 to-cyan-600 p-1.5 rounded-lg mr-3 shadow-[0_0_15px_rgba(20,184,166,0.2)]">
-                    <ShieldPlus className="text-white w-6 h-6" />
+                <div className="mr-3 w-9 h-9 flex-shrink-0">
+                    <img src="/assets/vericlaim-logo.png" alt="VeriClaim" className="w-full h-full object-contain drop-shadow-md dark:brightness-110" />
                 </div>
                 <h1 className="text-xl font-extrabold tracking-wide text-slate-800 dark:text-white flex items-center">
                     Veri<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-cyan-600 dark:from-teal-400 dark:to-cyan-400">Claim</span>
